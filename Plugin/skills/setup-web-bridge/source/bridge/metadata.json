@@ -1,0 +1,15 @@
+{
+  "name": "Web-Bridge",
+  "display_name": "Admin12211's Web-Bridge instance",
+  "version": "3.1.1",
+  "author": "admin12121",
+  "creator": "admin12121",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 admin12121",
+  "description": "A private ChatGPT Site gateway and locally controlled companion for authorized CTF work and local coding.",
+  "platforms": [
+    "Windows",
+    "macOS",
+    "Linux"
+  ]
+}

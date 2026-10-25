@@ -1,0 +1,468 @@
+{
+  "bridge_version": "3.0.0",
+  "tools": [
+    {
+      "name": "list_targets",
+      "description": "List challenge target origins explicitly authorized in server configuration.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "http_request",
+      "description": "Send real HTTP to an owner-approved exact origin. Supports headers, parameters, JSON, XML/raw bodies, forms, multipart uploads and binary responses. Cookies persist per target; redirects are never followed. Results include evidence IDs and response hashes; cookie values are redacted.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "default": "GET"
+          },
+          "path": {
+            "type": "string",
+            "default": "/"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "type": "string"
+          },
+          "body_base64": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "default": 12
+          },
+          "params": {
+            "type": "object"
+          },
+          "json_body": {
+            "type": "object"
+          },
+          "form": {
+            "type": "object"
+          },
+          "files": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "filename": {
+                  "type": "string"
+                },
+                "content_type": {
+                  "type": "string"
+                },
+                "data_base64": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "data_base64"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "http_batch",
+      "description": "Sequentially send up to 10 scoped requests for comparing behavior, without high request bursts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "default": "GET"
+                },
+                "path": {
+                  "type": "string",
+                  "default": "/"
+                },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "body": {
+                  "type": "string"
+                },
+                "body_base64": {
+                  "type": "string"
+                },
+                "timeout_seconds": {
+                  "type": "number",
+                  "default": 12
+                },
+                "params": {
+                  "type": "object"
+                },
+                "json_body": {
+                  "type": "object"
+                },
+                "form": {
+                  "type": "object"
+                },
+                "files": {
+                  "type": "array",
+                  "maxItems": 5,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string"
+                      },
+                      "filename": {
+                        "type": "string"
+                      },
+                      "content_type": {
+                        "type": "string"
+                      },
+                      "data_base64": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "data_base64"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "target",
+          "requests"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "inspect_html",
+      "description": "Fetch a page and extract its forms, fields, links, script references, and comments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "default": "/"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "session_cookies",
+      "description": "Inspect cookie names and metadata without exposing cookie values.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "reset_session",
+      "description": "Clear HTTP session cookies for a target.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browser_action",
+      "description": "Optional sandboxed Chromium: visit, snapshot, click, fill, press, evaluate JavaScript, or diagnostics. Requests are mediated through approved origins and pinned DNS. WebSockets and service workers are blocked. Browser and HTTP sessions are separate.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "visit",
+              "snapshot",
+              "click",
+              "fill",
+              "press",
+              "evaluate",
+              "diagnostics"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "default": "/"
+          },
+          "selector": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "script": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "request_history",
+      "description": "Read bounded evidence metadata: IDs, methods, approved URLs, status, timing, sizes and SHA-256. No raw cookies, headers or bodies in history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number",
+            "default": 20
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "bridge_status",
+      "description": "Read companion status, enabled CTF/coding permissions and active workspace alias. This tool cannot grant permissions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "workspace_list",
+      "description": "List bounded entries within the locally selected project. Sensitive paths, links and paths outside the workspace are rejected.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The current workspace_id returned by bridge_status. Never reuse an ID after local reconfiguration."
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "workspace_read",
+      "description": "Read a bounded UTF-8 file from the locally selected project and return its SHA-256 for safe edits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The current workspace_id returned by bridge_status. Never reuse an ID after local reconfiguration."
+          }
+        },
+        "required": [
+          "path",
+          "workspace_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "workspace_search",
+      "description": "Search project text for a literal string, returning bounded file/line matches.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The current workspace_id returned by bridge_status. Never reuse an ID after local reconfiguration."
+          }
+        },
+        "required": [
+          "query",
+          "workspace_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "workspace_edit",
+      "description": "Propose a UTF-8 text edit, using the original SHA-256 from workspace_read. Omit expected_sha256 only to create a new file in an existing directory. Local approval is required unless the owner granted session writes. Cannot change local permissions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "expected_sha256": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The current workspace_id returned by bridge_status. Never reuse an ID after local reconfiguration."
+          }
+        },
+        "required": [
+          "path",
+          "text",
+          "workspace_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "command_request",
+      "description": "Queue a bounded command. Container is default and uses a filtered project copy; Docker must be ready. Host mode requires separate local opt-in and exact approval every time. Reuse the same idempotency_key only for an identical retry. Poll command_status; never bypass pending approval.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "default": 30
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "container",
+              "host"
+            ],
+            "default": "container"
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The current workspace_id returned by bridge_status. Never reuse an ID after local reconfiguration."
+          }
+        },
+        "required": [
+          "argv",
+          "idempotency_key",
+          "workspace_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "command_status",
+      "description": "Read command state and bounded output. Pending operations must be approved in the local companion panel, never by another tool call.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "command_cancel",
+      "description": "Cancel a command in the current companion session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

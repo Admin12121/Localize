@@ -1,0 +1,23 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "admin12211-web-bridge-setup",
+  "version": "1.1.1",
+  "description": "Create your own private Web-Bridge Site and plugin from bundled source, then connect the Windows, macOS, or Linux companion.",
+  "author": {
+    "name": "admin12121"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Admin12211 Web-Bridge Setup",
+        "shortDescription": "Create your private Web-Bridge",
+        "longDescription": "An explicitly invoked setup workflow that creates an account-owned private Web-Bridge Site and its canonical MCP plugin. Includes portable source and cross-platform companion code. Requires Sites and a build-capable environment for initial setup; installation alone does not deploy anything.",
+        "developerName": "admin12121",
+        "category": "Developer Tools",
+        "capabilities": [],
+        "defaultPrompt": "Create my own private Admin12211's Web-Bridge instance using the bundled source, fresh account-owned Site identity and new secrets."
+      }
+    }
+  },
+  "license": "MIT"
+}

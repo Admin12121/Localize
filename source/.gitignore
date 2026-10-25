@@ -1,0 +1,17 @@
+dist/
+site.tar.gz
+bridge/.runtime/
+.env
+.dev.vars
+*.tgz
+*.zip
+__pycache__/
+.pytest_cache/
+node_modules/
+.test-deps/
+bridge/targets.json
+.superpowers/
+.test-runtime/
+
+*.pyz
+outputs/

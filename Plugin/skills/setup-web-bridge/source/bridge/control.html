@@ -1,0 +1,109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="author" content="admin12121"><meta name="creator" content="admin12121"><meta name="copyright" content="2026 admin12121 · MIT"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local controls · Admin12211's Web-Bridge instance</title><style>__STYLE__</style></head><body><main class="local-main">
+<header class="topbar"><div><p class="eyebrow">THIS COMPUTER · BY ADMIN12121</p><h1>Admin12211's Web-Bridge instance</h1></div><div class="top-actions"><span class="tag" id="live-state">Local controls</span><button id="theme" aria-label="Switch color theme">◐</button></div></header>
+<section id="login" class="frame"><div class="frame-header"><h3>Unlock local controls</h3></div><form id="login-form" class="panel"><label for="code">Local control code</label><input id="code" type="password" autocomplete="off" required><p>Enter the local code printed in your companion terminal. Keep it on this computer.</p><button class="primary">Unlock controls</button></form></section>
+<div id="content" hidden><div class="split page-heading"><div><h2>Local controls</h2><p id="status">Reading companion state…</p></div><button id="pause" class="danger">Pause bridge</button></div>
+<div class="notice" style="margin-bottom:20px">Approved files can be shared with ChatGPT. Permissions reset on restart.</div>
+<section class="frame" id="ctf-targets"><div class="frame-header"><h3>CTF & website targets</h3><p></p></div><div class="panel"><form id="target-form"><div class="grid"><div><label for="target-name">Target name</label><input id="target-name" value="challenge" maxlength="40" required placeholder="challenge"></div><div><label for="target-url">Website or CTF URL</label><input id="target-url" type="url" required placeholder="https://challenge.example:8443"></div></div><p class="small">Authorized websites only · access is limited to the scheme, host, and port.</p><div class="actions"><button class="primary">Add website</button></div></form><ul class="clean" id="target-list"></ul><label class="check"><input id="ctf" type="checkbox" checked><span>Allow ChatGPT to use these websites</span></label><details><summary>Advanced CTF options</summary><label class="check"><input id="allow_private" type="checkbox"><span>Allow private/loopback addresses for my authorized local lab</span></label></details><div class="actions"><button id="save-ctf" type="button">Save CTF settings</button></div><p class="small">Saving cancels jobs and clears pending approvals.</p></div></section>
+<div class="grid"><section class="frame"><div class="frame-header"><h3>Local coding · project & permissions</h3></div><form id="permissions" class="panel">
+<label for="root">Project folder</label><div class="actions" style="margin-top:0"><input id="root" placeholder="Select a project folder" style="flex:1;min-width:120px"><button id="browse" type="button">Browse…</button></div>
+<label for="alias">Workspace name</label><input id="alias" value="workspace" maxlength="60">
+<div class="toggle-grid"><label class="check"><input type="checkbox" id="read"><span>Read & search project files</span></label><label class="check"><input type="checkbox" id="write"><span>Propose file edits</span></label><label class="check"><input type="checkbox" id="execution"><span>Enable command requests</span></label><label class="check"><input type="checkbox" id="auto_write"><span>Apply text edits for this session without asking</span></label></div>
+<hr class="divider"><h4>Isolated commands</h4><p>Filtered project copy · Docker required.</p>
+<label for="image">Locally prepared container image</label><select id="image"><option>python:3.12-alpine</option><option>node:24-alpine</option><option>alpine:3.21</option></select>
+<label class="check"><input id="auto_container" type="checkbox"><span>Approve isolated commands for this session</span></label>
+<label class="check"><input id="network" type="checkbox"><span>Allow container internet access<br><span class="small muted">Commands may transmit the entire approved source copy. This is unrestricted outbound networking.</span></span></label>
+<hr class="divider"><h4>Host commands · advanced</h4><label class="check"><input id="host" type="checkbox"><span>Allow requests to run on this computer, with approval every time</span></label><div class="notice warning">Host commands use your OS account. They can access files beyond this project, including excluded files, use networking, and modify files without an edit preview. They are not isolated.</div>
+
+<div class="actions"><button class="primary">Save local permissions</button></div><p class="small">Saving cancels jobs and clears pending approvals.</p>
+</form></section><div><section class="frame"><div class="frame-header"><h3>Pending approvals</h3></div><div class="panel" id="approvals"><div class="empty">No pending operations</div></div></section><section class="frame"><div class="frame-header"><div class="split"><h3>Command activity</h3><span id="job-count" class="small muted">0 / 30</span></div></div><div class="panel activity-list" id="jobs" tabindex="0" aria-label="Command history"><div class="empty">No commands yet</div></div><button id="more-jobs" class="load-more" hidden>Load more</button></section><section class="frame"><div class="frame-header"><h3>2. Connect ChatGPT</h3></div><div class="panel"><p>Open your private Site → Overview. Save the terminal’s Site endpoint and key, then test. Keep keys out of chat.</p><details><summary>Prepare a container image</summary><pre>docker pull python:3.12-alpine</pre></details></div></section></div></div></div><footer class="small muted">Created by admin12121 · MIT · 3.1.1</footer><div id="feedback" class="feedback" role="status" aria-live="polite"></div></main>
+<script>
+const $=id=>document.getElementById(id);let csrf='',state=null,targets={},ctfSaving=false;const flags=['read','write','execution','host','network','auto_container','auto_write','ctf'];
+function say(text){$('feedback').textContent=text;clearTimeout(window.noticeTimer);window.noticeTimer=setTimeout(()=>$('feedback').textContent='',10000)}
+function theme(){document.documentElement.dataset.theme=localStorage.getItem('web-bridge-theme')||'dark'}theme();$('theme').onclick=()=>{localStorage.setItem('web-bridge-theme',document.documentElement.dataset.theme==='dark'?'light':'dark');theme()};
+async function api(path,data){const r=await fetch(path,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Web-Bridge-CSRF':csrf},...(data===undefined?{}:{body:JSON.stringify(data)})});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
+function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
+function action(parent,label,path,data){const b=node('button',label);b.type='button';b.onclick=async()=>{b.disabled=true;try{await api(path,data);await refresh(false);say(label+' completed')}catch(e){say(e.message)}finally{b.disabled=false}};parent.append(b)}
+function render(s,fill){state=s;$('status').textContent=(s.paused?'Paused':'Ready')+' · '+s.platform+' · '+(s.workspace||'No project selected');$('pause').textContent=s.paused?'Resume bridge':'Pause bridge';if(fill){$('root').value=s.root;$('alias').value=s.workspace||'workspace';flags.forEach(k=>$(k).checked=s.permissions[k]);$('image').value=s.permissions.image;targets={...s.targets};renderTargets();$('allow_private').checked=s.allow_private||false}
+ renderApprovals(s);renderJobs(s)}
+const approvalRows=new Map(),jobRows=new Map();let visibleJobs=10,etag='',refreshing=null;
+function reconcile(parent,map,items,create,update){
+ const keep=new Set(items.map(x=>x.job_id||x.edit_id));
+ for(const [id,row] of map){if(!keep.has(id)){row.remove();map.delete(id)}}
+ let cursor=parent.firstChild;
+ for(const item of items){const id=item.job_id||item.edit_id;let row=map.get(id);if(!row){row=create(item);map.set(id,row)}update?.(row,item);if(row!==cursor)parent.insertBefore(row,cursor);cursor=row.nextSibling}
+ parent.querySelectorAll('.empty').forEach(e=>e.remove());if(!items.length)parent.append(node('div','Nothing here yet','empty'));
+}
+function requestInfo(r){return (r.environment==='host'?'Host':'Container')+' · folder '+(r.cwd||'.')+' · timeout '+r.timeout+'s'+(r.environment==='container'?' · '+r.image+' · network '+(r.network?'on':'off'):'')}
+function renderApprovals(s){
+ const items=[...s.edits,...s.jobs.filter(j=>j.state==='pending')];
+ reconcile($('approvals'),approvalRows,items,item=>{
+  const edit=!!item.edit_id,id=item.edit_id||item.job_id,block=node('div',undefined,'approval-row');
+  block.append(node('h4',edit?item.path:(item.environment==='host'?'HOST · ':'Container · ')+item.label));
+  const details=node('details');details.open=true;details.append(node('summary',edit?'Review changes':'Review exact command'));
+  const preview=node('pre','Loading…');details.append(preview);block.append(details);
+  if(!edit&&item.environment==='host')block.append(node('p','Host access: can read or change files beyond the project.','warning small'));
+  const buttons=node('div',undefined,'actions');block.append(buttons);
+  api((edit?'/api/edit':'/api/job')+'?id='+encodeURIComponent(id)).then(d=>{
+   preview.textContent=edit?d.diff:JSON.stringify(d.request.argv,null,2);
+   if(!edit)details.append(node('p',requestInfo(d.request),'small muted'));
+   if(!edit&&d.state!=='pending')return;
+   action(buttons,edit?'Accept edit':'Accept command',edit?'/api/edit':'/api/command',edit?{edit_id:id,allow:true}:{job_id:id,allow:true});
+   action(buttons,'Decline',edit?'/api/edit':'/api/command',edit?{edit_id:id,allow:false}:{job_id:id,allow:false});
+  }).catch(e=>{preview.textContent=e.message;const retry=node('button','Retry');retry.onclick=()=>{approvalRows.delete(id);block.remove();renderApprovals(state)};buttons.append(retry)});
+  return block;
+ });
+}
+function renderJobs(s){
+ reconcile($('jobs'),jobRows,s.jobs.slice(0,visibleJobs),item=>{
+  const block=node('details',undefined,'activity-row'),summary=node('summary');
+  const title=node('span',undefined,'command-title'),badge=node('span',undefined,'tag');summary.append(title,badge);block.append(summary);
+  const body=node('div',undefined,'command-detail');block.append(body);block.titleNode=title;block.badge=badge;block.body=body;
+  block.ontoggle=()=>{if(block.open)loadJob(block)};return block;
+ },(block,item)=>{block.item=item;block.titleNode.textContent=item.label;block.badge.textContent=item.state;block.dataset.state=item.state;if(block.open)loadJob(block)});
+ $('job-count').textContent=s.jobs.length+' / 30';
+ $('more-jobs').hidden=visibleJobs>=s.jobs.length;
+}
+async function loadJob(block){
+ const item=block.item,signature=JSON.stringify(item);
+ if(block.loading||block.signature===signature)return;block.loading=true;
+ try{const job=await api('/api/job?id='+encodeURIComponent(item.job_id));const body=block.body;body.replaceChildren();
+  body.append(node('p',requestInfo(job.request),'small muted'),node('pre',JSON.stringify(job.request.argv,null,2),'command-request'),node('pre',job.output||'No output','command-output'));
+  if(job.truncated)body.append(node('p','Output limit reached (64 KB).','small muted'));
+  if(job.snapshot)body.append(node('pre',JSON.stringify(job.snapshot,null,2)));
+  if(job.exit_code!==undefined)body.append(node('p','Exit code '+job.exit_code,'small muted'));
+  if(['running','approved'].includes(job.state)){const buttons=node('div',undefined,'actions');action(buttons,'Cancel','/api/cancel',{job_id:job.job_id});body.append(buttons)}
+  block.signature=signature;
+ }catch(e){block.body.replaceChildren(node('p',e.message))}finally{block.loading=false;if(block.isConnected&&block.open&&JSON.stringify(block.item)!==signature)loadJob(block)}
+}
+function moreJobs(){visibleJobs+=10;if(state)renderJobs(state)}
+$('more-jobs').onclick=moreJobs;
+$('jobs').onscroll=()=>{const e=$('jobs');if(e.scrollTop+e.clientHeight>=e.scrollHeight-50&&state&&visibleJobs<state.jobs.length)moreJobs()};
+async function refresh(fill=false){
+ if(refreshing){await refreshing;if(fill)return refresh(true);return}
+ refreshing=(async()=>{const r=await fetch('/api/state',{headers:!fill&&etag?{'If-None-Match':etag}:{}});
+ if(r.status===304)return;
+ const d=await r.json();if(!r.ok)throw Error(d.error||'Connection failed');etag=r.headers.get('ETag')||'';render(d,fill);
+ })();try{await refreshing;$('live-state').textContent='Live'}finally{refreshing=null}
+}
+let pollTimer;
+async function poll(){clearTimeout(pollTimer);if(csrf&&!document.hidden){try{await refresh(false)}catch(e){$('live-state').textContent='Reconnecting…';if(e.message.includes('Sign in')){csrf='';$('login').hidden=false;$('content').hidden=true}}}pollTimer=setTimeout(poll,750)}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});
+$('login-form').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/login',{code:$('code').value});csrf=d.csrf;$('code').value='';$('login').hidden=true;$('content').hidden=false;await refresh(true)}catch(e){say(e.message)}};
+$('browse').onclick=async()=>{try{say('Choose a folder in the local picker…');const d=await api('/api/choose-folder',{});if(d.path)$('root').value=d.path}catch(e){say(e.message)}};
+$('permissions').onsubmit=async e=>{e.preventDefault();try{const permissions=Object.fromEntries(flags.map(k=>[k,$(k).checked]));permissions.image=$('image').value;await api('/api/configure',{root:$('root').value.trim(),alias:$('alias').value,permissions,targets,allow_private:$('allow_private').checked});await refresh(true);say('Local permissions saved. Previous approvals were revoked.')}catch(e){say(e.message)}};
+$('pause').onclick=async()=>{try{await api('/api/pause',{paused:!state.paused});await refresh(false)}catch(e){say(e.message)}};
+
+function parseWebsiteTarget(name,value) {
+  name=name.trim();value=value.trim();
+  if(!/^[A-Za-z0-9_-]{1,40}$/.test(name)||['__proto__','constructor','prototype'].includes(name))throw Error('Use a target name with 1–40 letters, numbers, hyphens, or underscores.');
+  let url;try{url=new URL(value)}catch{throw Error('Enter a complete http:// or https:// website URL.');}
+  if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Use an HTTP or HTTPS website without login credentials in its URL.');
+  return {name,origin:url.origin};
+}
+function renderTargets(){const list=$('target-list');list.replaceChildren();for(const [name,url] of Object.entries(targets)){const li=node('li',undefined,'target split');const info=node('div');info.append(node('strong',name),node('div',url,'small muted'));const remove=node('button','Remove');remove.type='button';remove.onclick=()=>{const next={...targets};delete next[name];saveTargets(next).catch(e=>say(e.message))};li.append(info,remove);list.append(li)}if(!list.children.length)list.append(node('li','No websites added yet. Enter a name and URL above.','empty'))}
+async function saveTargets(next){if(ctfSaving)return;ctfSaving=true;try{const current=await api('/api/state');await api('/api/configure',{root:current.root,alias:current.workspace||'workspace',permissions:{...current.permissions,ctf:$('ctf').checked},targets:next,allow_private:$('allow_private').checked});await refresh(true);say('Website settings saved.')}finally{ctfSaving=false}}
+$('target-form').onsubmit=async e=>{e.preventDefault();try{const target=parseWebsiteTarget($('target-name').value,$('target-url').value);if(Object.hasOwn(targets,target.name))throw Error('That target name already exists. Choose another name or remove its old entry.');await saveTargets({...targets,[target.name]:target.origin});$('target-url').value=''}catch(e){say(e.message)}};
+$('save-ctf').onclick=()=>saveTargets({...targets}).catch(e=>say(e.message));
+
+poll();
+</script></body></html>

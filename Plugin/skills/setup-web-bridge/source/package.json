@@ -1,0 +1,19 @@
+{
+  "name": "ctf-web-bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "validate": "node scripts/validate-artifact.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "db:generate": "drizzle-kit generate"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.45.3"
+  },
+  "version": "3.1.1",
+  "author": "admin12121",
+  "license": "MIT",
+  "description": "A private ChatGPT Site gateway and locally controlled companion for authorized CTF work and local coding."
+}
