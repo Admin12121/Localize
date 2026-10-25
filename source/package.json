@@ -5,8 +5,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "validate": "node scripts/validate-artifact.mjs",
-    "test": "node --test tests/*.test.mjs",
-    "db:generate": "drizzle-kit generate"
+    "test": "node scripts/check-repo.mjs && node --test tests/*.test.mjs",
+    "db:generate": "drizzle-kit generate",
+    "check:repo": "node scripts/check-repo.mjs"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.11",

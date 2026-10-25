@@ -185,7 +185,12 @@ class Jobs:
                 job['state']='completed'
         except Exception as exc:
             with self.lock:
-                if job['state']!='cancelled':job['state']='failed';job['output']=str(exc) if isinstance(exc,WorkspaceError) else 'Command could not start or finish; check local prerequisites and permissions.'
+                if job['state']!='cancelled':
+                    job['state']='failed'
+                    if isinstance(exc,WorkspaceError):job['output']=str(exc)
+                    elif isinstance(exc,(OSError,subprocess.SubprocessError)):
+                        job['output']='Command launch or execution failed ('+type(exc).__name__+'). Check executable, working directory, container engine and local permissions.'
+                    else:job['output']='Command failed ('+type(exc).__name__+'). Check local prerequisites and logs.'
         finally:
             if timer:timer.cancel()
             if job['group']:job['group'].close()

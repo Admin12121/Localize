@@ -1,0 +1,19 @@
+# This directory is an extracted release wrapper.
+# Track canonical code in source/. Publish its contents as GitHub source.
+# These are independently generated distributions, not development sources.
+/Companion/
+/Plugin/
+/Web-Bridge.pyz
+/README-FIRST.md
+
+# Generated build state and local credentials
+/source/dist/
+/source/outputs/
+/source/bridge/.runtime/
+/source/bridge/targets.json
+**/__pycache__/
+**/.pytest_cache/
+**/node_modules/
+**/.env
+**/.env.*
+**/.dev.vars

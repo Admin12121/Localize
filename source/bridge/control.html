@@ -22,7 +22,7 @@ function say(text){$('feedback').textContent=text;clearTimeout(window.noticeTime
 function theme(){document.documentElement.dataset.theme=localStorage.getItem('web-bridge-theme')||'dark'}theme();$('theme').onclick=()=>{localStorage.setItem('web-bridge-theme',document.documentElement.dataset.theme==='dark'?'light':'dark');theme()};
 async function api(path,data){const r=await fetch(path,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Web-Bridge-CSRF':csrf},...(data===undefined?{}:{body:JSON.stringify(data)})});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
 function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
-function action(parent,label,path,data){const b=node('button',label);b.type='button';b.onclick=async()=>{b.disabled=true;try{await api(path,data);await refresh(false);say(label+' completed')}catch(e){say(e.message)}finally{b.disabled=false}};parent.append(b)}
+function action(parent,label,path,data){const b=node('button',label);b.type='button';b.onclick=async()=>{b.disabled=true;try{await api(path,data);await refresh(false);say(label==='Accept command'?'Command approved and queued; check its job status for execution results.':label+' completed')}catch(e){say(e.message)}finally{b.disabled=false}};parent.append(b)}
 function render(s,fill){state=s;$('status').textContent=(s.paused?'Paused':'Ready')+' · '+s.platform+' · '+(s.workspace||'No project selected');$('pause').textContent=s.paused?'Resume bridge':'Pause bridge';if(fill){$('root').value=s.root;$('alias').value=s.workspace||'workspace';flags.forEach(k=>$(k).checked=s.permissions[k]);$('image').value=s.permissions.image;targets={...s.targets};renderTargets();$('allow_private').checked=s.allow_private||false}
  renderApprovals(s);renderJobs(s)}
 const approvalRows=new Map(),jobRows=new Map();let visibleJobs=10,etag='',refreshing=null;
@@ -67,7 +67,7 @@ async function loadJob(block){
  const item=block.item,signature=JSON.stringify(item);
  if(block.loading||block.signature===signature)return;block.loading=true;
  try{const job=await api('/api/job?id='+encodeURIComponent(item.job_id));const body=block.body;body.replaceChildren();
-  body.append(node('p',requestInfo(job.request),'small muted'),node('pre',JSON.stringify(job.request.argv,null,2),'command-request'),node('pre',job.output||'No output','command-output'));
+  body.append(node('p',requestInfo(job.request),'small muted'),node('pre',JSON.stringify(job.request.argv,null,2),'command-request'),node('pre',job.output||(job.state==='failed'?'Command failed without diagnostic output.':'No output'),'command-output'));
   if(job.truncated)body.append(node('p','Output limit reached (64 KB).','small muted'));
   if(job.snapshot)body.append(node('pre',JSON.stringify(job.snapshot,null,2)));
   if(job.exit_code!==undefined)body.append(node('p','Exit code '+job.exit_code,'small muted'));
