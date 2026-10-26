@@ -33,5 +33,5 @@ try:
     assert 'Work precisely' in c.skill_read('web-bridge-project-work',workspace_id=c.workspace_id)['text']
 finally:c.close()
 '''
-    result=subprocess.run([sys.executable,'-I','-c',code,str(ROOT/'src'),str(tmp_path/'project'),str(tmp_path/'runtime')],cwd=tmp_path,capture_output=True,text=True,timeout=15)
+    result=subprocess.run([sys.executable,'-I','-B','-c',code,str(ROOT/'src'),str(tmp_path/'project'),str(tmp_path/'runtime')],cwd=tmp_path,capture_output=True,text=True,timeout=15)
     assert result.returncode==0,result.stderr

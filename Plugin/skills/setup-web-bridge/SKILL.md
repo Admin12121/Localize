@@ -25,7 +25,7 @@ The complete portable source is in `source/` next to this skill, including `READ
 
 ## Companion connection
 
-The owner downloads the cross-platform companion from their own private Site, installs Python and cloudflared locally, and launches the single-file `python Web-Bridge.pyz` on Windows or `python3 Web-Bridge.pyz` on macOS/Linux. This starts the authenticated tunnel by default; `--local-only` disables it. The source ZIP retains `launch.py --tunnel` for existing installs. It opens a separate loopback control panel. The owner enters the local control code from the terminal, selects their project and permissions locally, and saves the printed Site endpoint/key only in their private Site form.
+The owner downloads the cross-platform companion from their own private Site, installs Python and cloudflared locally, and launches the single-file `python Web-Bridge.pyz` on Windows or `python3 Web-Bridge.pyz` on macOS/Linux. This starts the authenticated tunnel by default; `--local-only` disables it. From source or an extracted companion ZIP, run `python scripts/run.py --tunnel` (`python3` on macOS/Linux). It opens a separate loopback control panel. The owner enters the local control code from the terminal, selects their project and permissions locally, and saves the printed Site endpoint/key only in their private Site form.
 
 Docker is required only for isolated commands. The owner prepares an allowed image locally. Commands are disabled until opted in; host execution requires exact approval every time. Never enable host mode or approve a command merely to get a test passing. Permissions cannot be granted through MCP tools.
 

@@ -161,7 +161,7 @@ trap cleanup EXIT INT TERM
 
 export CTF_ALLOWED_ORIGINS="${CTF_ALLOWED_ORIGINS:-https://chatgpt.com,https://chat.openai.com}"
 echo 'Starting authenticated MCP server on 127.0.0.1...'
-python3 -u "$BRIDGE" http --host 127.0.0.1 --port "$PORT" > "$BRIDGE_LOG" 2>&1 &
+python3 -u -m web_bridge.transport http --host 127.0.0.1 --port "$PORT" > "$BRIDGE_LOG" 2>&1 &
 BRIDGE_PID=$!
 READY=0
 for _ in {1..30}; do

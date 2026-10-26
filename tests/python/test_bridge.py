@@ -11,7 +11,7 @@ from urllib.error import HTTPError
 import pytest
 
 import web_bridge.web.client as m
-from web_bridge.transport.rpc import rpc
+from web_bridge.transport.rpc import rpc as dispatch_rpc
 from web_bridge.transport.http import handler_factory
 
 
@@ -109,14 +109,14 @@ def test_default_private_address_block():
 
 def test_mcp_rpc(app):
     def rpc(method, params=None, mid=1):
-        return rpc({'jsonrpc': '2.0', 'id': mid, 'method': method, 'params': params or {}}, app)
+        return dispatch_rpc({'jsonrpc': '2.0', 'id': mid, 'method': method, 'params': params or {}}, app)
     assert rpc('initialize')['result']['serverInfo']['name'] == 'ctf-instance-bridge'
     tools = rpc('tools/list')['result']['tools']
     assert {'http_request', 'browser_action', 'inspect_html', 'http_batch', 'list_targets', 'reset_session', 'session_cookies', 'request_history'} <= {v['name'] for v in tools}
     args = {'name': 'http_request', 'arguments': {'target': 'lab', 'path': '/'}}
     assert json.loads(rpc('tools/call', args)['result']['content'][0]['text'])['status'] == 200
     assert rpc('tools/call', {'name':'unknown'})['result']['isError']
-    assert rpc({'jsonrpc':'2.0', 'method':'notifications/initialized'}, app) is None
+    assert dispatch_rpc({'jsonrpc':'2.0', 'method':'notifications/initialized'}, app) is None
 
 
 def test_authenticated_http_mcp(app):
