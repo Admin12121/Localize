@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
+import {readmePath} from '../scripts/readme.mjs';
 
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 
@@ -14,12 +15,13 @@ test('the published bridge version agrees across source metadata', () => {
   assert.ok(catalog.tools.length > 0);
 });
 
-test('source and distribution documentation dependencies exist', () => {
+test('source and distribution dependencies exist', () => {
   for (const file of [
-    'README.md', 'SECURITY.md', 'LICENSE',
+    'LICENSE', 'scripts/readme.py',
     'bridge/bundle-entry.py', 'scripts/package-setup.py',
     'setup-plugin/skills/setup-web-bridge/SKILL.md',
   ]) {
     assert.ok(existsSync(join(process.cwd(), file)), `Missing repository source: ${file}`);
   }
+  assert.ok(existsSync(readmePath()), 'Missing main README');
 });

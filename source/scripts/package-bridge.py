@@ -2,7 +2,7 @@
 from pathlib import Path
 from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
 root=Path('bridge');out=Path('outputs');out.mkdir(exist_ok=True)
-files=[root/name for name in ['metadata.json','launch.py','start.ps1','start.sh','control.html','ui.css','configure-targets.py','example.targets.json','BRIDGE_TOOLS.json','README.md']]+sorted((root/'server').glob('*.py'))+sorted(root.glob('requirements-*.txt'))+sorted(root.glob('skills/*/SKILL.md'))
+files=[root/name for name in ['metadata.json','launch.py','start.ps1','start.sh','control.html','ui.css','configure-targets.py','example.targets.json','BRIDGE_TOOLS.json']]+sorted((root/'server').glob('*.py'))+sorted(root.glob('requirements-*.txt'))+sorted(root.glob('skills/*/SKILL.md'))
 with ZipFile(out/'web-bridge-companion.zip','w',ZIP_DEFLATED) as archive:
     for file in files:
         info=ZipInfo('web-bridge-companion/'+str(file.relative_to(root)).replace('\\','/'),(2026,10,25,0,0,0))

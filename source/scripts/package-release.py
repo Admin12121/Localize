@@ -3,6 +3,7 @@ from pathlib import Path
 from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
 import hashlib
 import shutil
+from readme import portable_readme
 
 out=Path('outputs')
 required=['Web-Bridge.pyz','web-bridge-companion.zip','web-bridge-setup-plugin.zip','web-bridge-portable-source.zip']
@@ -14,16 +15,7 @@ assets={
     'Web-Bridge-Setup-Plugin.zip':(out/'web-bridge-setup-plugin.zip').read_bytes(),
     'Web-Bridge-GitHub-Source.zip':(out/'Web-Bridge-GitHub-Source.zip').read_bytes(),
     'LICENSE':Path('LICENSE').read_bytes(),
-    'README-FIRST.md':(
-        '# Web-Bridge release\n\n'
-        'Created by admin12121. MIT license.\n\n'
-        'Install Python 3.10+ and cloudflared, then run `python Web-Bridge.pyz` '
-        '(Windows) or `python3 Web-Bridge.pyz` (macOS/Linux).\n\n'
-        'Each owner must deploy their own private ChatGPT Site and connection key. '
-        'Open Web-Bridge-GitHub-Source.zip for README.md and SECURITY.md.\n\n'
-        'Distribute ZIP and pyz files as release assets, not duplicated '
-        'GitHub source. Never publish local runtime credentials.\n'
-    ).encode('utf-8'),
+    'README.md':portable_readme(),
 }
 checksums=''.join(hashlib.sha256(data).hexdigest()+'  '+name+'\n' for name,data in sorted(assets.items()))
 (out/'SHA256SUMS').write_text(checksums,encoding='utf-8',newline='\n')

@@ -2,14 +2,16 @@
 
 **Connect ChatGPT to your project, with permissions controlled on your computer.**
 
-Version **3.2.0** · Created by [admin12121](https://github.com/Admin12121) · [MIT license](LICENSE)
+Version **3.2.0** · Setup plugin **1.2.0** · Created by [admin12121](https://github.com/Admin12121) · [MIT license](LICENSE)
 
-Web-Bridge combines your private ChatGPT Site, an MCP gateway, and a local Python companion. Read and update project files, run approved commands, use a persistent Docker project, connect selected skill/MCP adapters, and save work to resume later.
+Read and update files, run approved host or Docker commands, connect selected skills/MCP applications, and save work for later continuation. A private Site forwards authenticated calls to the local Python companion. The local control panel selects the project and grants access.
 
-## Start here
+![System architecture](images/01-system-architecture.png)
 
-1. Deploy your own private Site with the trusted setup package. Follow [Setup](source/SETUP.md); importing the package alone does not deploy it.
-2. Install **Python 3.10+** and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/), then download `Web-Bridge.pyz` from your trusted release or private Site.
+## Start
+
+1. Install Python **3.10+** and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Docker is needed only for Docker commands. Node.js **22.13+** is needed for source builds.
+2. Provision your own private Site using the trusted setup-plugin ZIP in a Sites-enabled chat with build tools. Explicitly invoke its setup workflow to deploy a private Site and return its generated plugin. Importing the ZIP alone does not deploy anything. The executable [setup skill](source/setup-plugin/skills/setup-web-bridge/SKILL.md) contains the provisioning instructions.
 3. Run the companion:
 
    ```powershell
@@ -22,85 +24,121 @@ Web-Bridge combines your private ChatGPT Site, an MCP gateway, and a local Pytho
    python3 Web-Bridge.pyz
    ```
 
-4. Open the printed local panel, enter its control code, select your project, and save the permissions and command profile you want.
-5. Save the printed remote Site endpoint and connection key **only in your private Site's connection form**. Select its generated plugin in ChatGPT.
-6. Call `bridge_status`, check the workspace and profile, then read a known file or run a harmless command and inspect its actual result.
+4. Open the printed local panel and enter its control code. Select your project, permissions, command environment, shell and timeouts. Host commands always need exact approval for each command.
+5. Save the printed remote HTTPS endpoint/key only in your private Site's connection form. Select its generated plugin in ChatGPT and call `bridge_status`.
+6. Read a known file and submit a harmless command. Inspect its actual result and intended effect before relying on the connection.
 
-Core companion features need no pip installation or extraction. The bundle starts a Quick Tunnel by default; use `--local-only` to disable it. Keep it running while connected. Docker, browser actions, MCP adapters and the optional local agent have separate setup requirements.
+Core features need no pip installation or extraction. Keep the companion running. The bundle starts a Quick Tunnel by default; `--local-only` disables it. From the repository root, the source launcher is `python source/bridge/launch.py --tunnel`. Never tunnel the loopback control panel.
 
-## How the connection works
+![Build, deploy and connect](images/06-build-deploy-connect.png)
 
-![ChatGPT, private Site and local companion](docs/images/01-system-architecture.png)
+## Project files and commands
 
-```text
-ChatGPT + your Site-generated plugin
-    → private Site / authenticated MCP gateway
-    → authenticated HTTPS tunnel
-    → local Python companion
-        ├─ selected project files and saved tasks
-        ├─ approved HTTP/browser targets and selected MCP adapters
-        └─ approved host, snapshot or live Docker command jobs
+Use the current `workspace_id` from `bridge_status`. File paths are relative to the selected project. Read the current hash before editing an existing file; omit the hash only when creating an absent file. Approved text creation can create missing parent folders. Folder operations support mkdir, move, recoverable delete and restore. Recursive deletion needs its separate local grant and preview. A proposal is not an applied change: inspect results and read back the file.
 
-Separate local panel: project, permissions, approvals, Docker setup, pause
+![Workspace edit lifecycle](images/04-workspace-edit-lifecycle.png)
+
+For terminal syntax, send `command` with the locally configured `shell`; for exact executable arguments, send `argv`. Never send both. On Windows, use Command Prompt (`cmd`) for npm/npx batch launchers. Omit `environment` to use the local profile; a conflicting explicit environment is rejected.
+
+```json
+{"workspace_id":"<current-id>","command":"npm test","shell":"cmd","idempotency_key":"project-tests-001"}
 ```
 
-The companion enforces permissions. The Site cannot select a project, grant access or approve a command. Only the authenticated RPC endpoint belongs behind the tunnel; the local control panel stays on loopback. The illustration is conceptual: host commands use your OS account and are not confined to the selected project.
+Submit once, retain the returned job ID, then poll `command_status`. `pending` and `approved` do not mean execution succeeded. Nonzero exits report `failed` and `success: false`; timeout and cancellation are distinct. Inspect `success`, `exit_code`, output and `cleanup_pending`, then verify the intended effect. `output_offset` reads incremental output.
 
-## What 3.2 provides
+![Host command lifecycle](images/02-host-command-lifecycle.png)
 
-| Area | Available behavior | Boundary |
-| --- | --- | --- |
-| Project files | List/search/read, hash-checked text edits and nested creates; mkdir, move, recoverable delete and restore | Bounded UTF-8 edits; local approval or separate session grants; recursive deletion needs its own grant |
-| Commands | Explicit shell text or exact argument arrays; launch evidence, success/failure, timeout/cancellation, incremental output | Host always needs approval for each command; process success still needs an outcome check |
-| Docker | Filtered snapshot jobs, or a persistent container mapped to the real project; local check/pull/create/attach controls | Explicit local setup; live commands can change shared files directly; no host fallback |
-| Skills and applications | Built-in project-work skill, selected local skill folders and allowlisted stdio/HTTP MCP tools | Optional dependencies; adapters define available application access; no automatic arbitrary desktop control |
-| Saved work | SQLite tasks, evidence, checkpoints, handoff and machine checks; resume with ChatGPT | Resume on the next prompt; automatic ChatGPT event prompts are not enabled |
-| Optional local agent | Explicitly started API-backed saved-task execution within step/time/token budgets | Separate API credentials/dependencies and billing; approvals still apply; no fixed-cost guarantee |
-| Web work | Approved-origin HTTP, forms, cookies/history and optional Chromium actions | Exact locally approved origins; no redirects; separate browser setup |
+Command receipts persist locally across restarts and never automatically replay work. Potentially unfinished commands become interrupted with an unknown outcome. Inspect the recorded identity and real project effects; stop or verify the work locally, then choose **I checked this command is stopped**. New writes stay blocked until review. Failed live-Docker cleanup retains its execution identity and writer lease, including when receipt storage is unavailable.
 
-Command profiles default to **10 minutes** and allow an owner-selected maximum of **1 hour**. Output is bounded to 64,000 bytes. The dashboard retains up to 200 compact rows and the newest 160 detailed receipts; durable identity/idempotency receipts remain across restarts. Text files are limited to 256,000 bytes; snapshots to 50 MB and 5,000 entries. See [usage and limits](source/docs/usage.md).
+## Docker
 
-## Commands: approve, poll, verify
+Start Docker Desktop in Linux-container mode or a local Linux Docker engine. Choose one of two modes:
 
-![Command approval, execution and result polling](docs/images/02-host-command-lifecycle.png)
-
-Use `command_request` once with an idempotency key, then poll `command_status` using the returned job ID. A nonzero exit now reports `failed` and `success: false`; timeout and cancellation have distinct states. Check `success`, `exit_code`, output and `cleanup_pending`, then verify the intended file or service. Approval only permits launch.
-
-For terminal syntax use `command` with the locally configured `shell`. For exact executable arguments use `argv`; never supply both. On Windows use `command` with `shell: "cmd"` for npm/npx batch launchers. Omit `environment` to use the local profile; a conflicting explicit environment is rejected. [Tool examples](source/docs/usage.md) use the real API names rather than the illustration's labels.
-
-## Choose the right Docker mode
-
-**Isolated snapshot** runs against a filtered temporary project copy. Eligible changes become separately controlled proposals. Unsupported, excluded, conflicting or over-limit changes are reported; affected snapshots remain available locally for inspection rather than disappearing silently.
-
-**Live Docker project** maps the selected real folder into a persistent Linux container. In the local panel, save Docker setup, check the engine, explicitly prepare an image if needed, and create or attach a validated container. Select the live Docker command profile. Dependencies and project changes can persist; commands write directly to shared files. Stop/remove controls apply only to bridge-owned containers. See [Docker setup](source/SETUP.md#docker-modes).
-
-## Save and resume work
-
-Use `task_create`, checkpoint evidence and remaining work with `task_checkpoint`, then inspect `task_list` / `task_read` on the next prompt. After a restart or project-session change, the owner selects **Use in ChatGPT** in Saved work to rebind the task. `task_verify` checks configured file contents/hashes or successful command job IDs before marking it machine-verified complete. Manual/text criteria can instead be explicitly confirmed by the owner in local Saved work; that is recorded as owner review. Interrupted mutations are not automatically replayed.
-
-For independent continuation, install/configure the optional local agent and explicitly start a saved task locally. Its budgets bound each run, not its dollar cost. A skill alone cannot keep ChatGPT running or send a new prompt. This build reports `chatgpt_events: false`.
-
-## Guides
-
-| Guide | Purpose |
+| Mode | Behavior |
 | --- | --- |
-| [Setup and migration](source/SETUP.md) | Connection, Docker, optional dependencies and upgrading from 3.1 |
-| [Usage](source/docs/usage.md) | All 27 tools, examples, approvals and limits |
-| [Troubleshooting](source/docs/troubleshooting.md) | Command results, Windows shells, Docker, files and task recovery |
-| [Architecture](source/ARCHITECTURE.md) | Source ownership, data flow and boundaries |
-| [Companion reference](source/bridge/README.md) | Launch options, runtime storage and local controls |
-| [Illustrated workflows](docs/illustrations.md) | Eight preserved diagrams with current implementation notes |
-| [Release scope and next steps](source/docs/roadmap.md) | Implemented behavior and remaining limitations |
-| [Contributing](source/CONTRIBUTING.md) / [Security](source/SECURITY.md) | Development checks and private reporting |
+| Isolated snapshot (`container`) | Fresh filtered project copy at `/workspace`; eligible edits/deletions become proposals. The original project is not mounted. |
+| Live project (`docker`) | Persistent container with the selected real project mapped into it; commands change shared files directly. |
+
+For a live project, save the selected project first. In **Live Docker project**, set a local context, image, container path such as `/workspace`, and network setting. Choose **Check Docker**, explicitly **Prepare image** if missing, then **Create project container** or **Attach selected container**. An attached container must already have the matching host-project bind mount. Save the live-Docker command profile with `sh` or `bash`, call `docker_status`, and verify a harmless command.
+
+The bridge pins the context and mapping, rejects socket exposure and never silently switches to the host. Stop/remove controls apply only to bridge-owned containers; cancellation targets the command's execution group. Dependencies and changes can persist in a live project.
+
+For snapshots, explicitly prepare and select a supported image: `python:3.12-alpine`, `node:24-alpine` or `alpine:3.21`. No command silently pulls an image. Networking needs a separate grant. Inspect all synchronization results: excluded, unsupported, conflicting or excessive changes retain an artifact rather than proving complete sync. Review it before **Discard retained snapshot**.
+
+![Docker snapshot lifecycle](images/03-docker-snapshot-job.png)
+
+## Skills, applications and continuation
+
+Enable selected skills/MCP tools locally. Load the built-in `web-bridge-project-work` through `skill_list` / `skill_read`, or select trusted folders containing `SKILL.md`. Skill text does not install dependencies, grant access or expose an application.
+
+MCP adapters and the optional local agent require Python **3.11+**. Install only the features you use into the Python environment that launches the companion:
+
+```sh
+python -m pip install -r source/bridge/requirements-integrations.txt
+python -m pip install -r source/bridge/requirements-agent.txt
+```
+
+Configure application adapters locally with their stdio executable/arguments or Streamable HTTP URL, credentials and explicit allowed tool names. An empty allowlist permits nothing. `mcp_tools` discovers selected tools; `mcp_call` validates arguments and does not automatically retry interrupted calls. Inspect application state before retrying a mutation.
+
+Save substantial work with `task_create`, then checkpoint actual evidence, job IDs, remaining work and handoff using `task_checkpoint`. Read `task_list` / `task_read` on the next prompt. After a session change, choose **Use in ChatGPT** locally to rebind the task. `task_verify` requires real configured checks; manual criteria need explicit local owner review.
+
+```json
+{"workspace_id":"<current-id>","intent":"Create and verify a project file","checks":[{"kind":"file","path":"example.txt","contains":"ready"}]}
+```
+
+For independent continuation, configure an explicit model, API-key environment-variable **name**, and finite step/time/token budgets in the local runner panel, then explicitly start a saved task. Set the key before starting the companion. Saving setup alone makes no API call. API usage is separately billed, approvals still apply, and a budget is not a dollar guarantee.
+
+**Automatic ChatGPT prompts are not enabled** (`chatgpt_events: false`). A skill cannot extend platform session limits. ChatGPT resumes on the next prompt; the independent local runner can continue only after its explicit start.
+
+![Expanded workflow concept](images/07-expanded-workflow-concept.png)
+
+## Tool reference
+
+| Area | Tools |
+| --- | --- |
+| Connection | `bridge_status` |
+| Project | `workspace_list`, `workspace_read`, `workspace_search`, `workspace_edit`, `workspace_operation` |
+| Commands | `command_request`, `command_status`, `command_cancel`, `docker_status` |
+| Integrations | `skill_list`, `skill_read`, `mcp_tools`, `mcp_call` |
+| Saved work | `task_create`, `task_list`, `task_read`, `task_checkpoint`, `task_verify` |
+| Web | `list_targets`, `http_request`, `http_batch`, `inspect_html`, `browser_action`, `session_cookies`, `request_history`, `reset_session` |
+
+The machine-readable tool catalog is `source/bridge/BRIDGE_TOOLS.json`. Local controls configure permissions, integrations, Docker and the runner; tools cannot grant themselves access.
+
+![Approved HTTP request lifecycle](images/05-approved-http-request.png)
+
+## Limits, recovery and troubleshooting
+
+| Item | Limit or behavior |
+| --- | --- |
+| Commands | Default 600 seconds; owner-selected maximum up to 3,600 seconds; 30 active jobs |
+| Output/history | 64,000 output bytes; 200 compact dashboard rows; newest 160 detailed durable receipts |
+| Files/snapshots | 256,000-byte UTF-8 text files; snapshot 50 MB/5,000 entries; ten retained snapshots |
+| File protection | Hash checks, path boundaries, recoverable trash; preserve reported recovery paths until reviewed |
+| Host/live Docker | Approved commands can change more than file-tool permissions allow; host jobs use the OS account |
+| Web | Exact approved origins; no redirects; browser actions need optional Playwright/Chromium |
+
+- **Approved but no effect:** inspect the job's output, exit code, selected environment and intended file/service. Approval permits launch; snapshot changes may still need application. A process exit does not prove a GUI opened.
+- **Docker unavailable:** check the local Linux engine, selected context, prepared image, matching mount and shell. Choose the correct local profile instead of falling back to host execution.
+- **Writes blocked:** inspect pending approvals, competing writer leases and interrupted-command recovery. Do not replay an uncertain mutation.
+- **New tools absent:** rebuild/redeploy the private Site gateway and update its generated plugin; replacing local files alone does not publish the installed deployment.
+- **Browser setup:** install `playwright` and run `python -m playwright install chromium` in the companion's environment if using browser tools.
+
+Use `--help` for launch options and `--runtime` to intentionally reuse an existing runtime after stopping its old process. The default bundle runtime is `%LOCALAPPDATA%/Web-Bridge/runtime` on Windows, `~/Library/Application Support/Web-Bridge/runtime` on macOS, and `$XDG_STATE_HOME/web-bridge` or `~/.local/state/web-bridge` on Linux. Grants reset on restart; credentials, configuration, tasks and receipts remain local. Quick Tunnel URLs may change; update the private Site endpoint and leave its key field blank to retain an unchanged key.
+
+Never publish runtime data, credentials, recovery artifacts or selected project contents. Preserve the private Site's identity, encryption secret and database during upgrades. Use only authorized projects/targets. macOS-specific behavior has not been tested on macOS hardware; optional paid-model and real third-party app actions were not exercised in release verification.
+
+![Expanded architecture concept](images/08-expanded-architecture-concept.png)
+
+The eight supplied illustrations are conceptual. Their embedded names/layouts may differ from the actual tool catalog. They do not imply automatic image building, arbitrary desktop control, unlimited audit retention or automatic ChatGPT continuation.
 
 ## Develop and package
 
-Canonical development code is in **`source/`**. Root `Companion/`, `Plugin/` and `Web-Bridge.pyz` are generated distributions. Requires Node.js 22.13+ and Python 3.10+; optional MCP/agent packages require Python 3.11+.
+Development code lives in `source/` in this checkout. Exported source places those contents at its root; skip the first `cd` there and omit the `source/` prefix from paths above. `Companion/`, `Plugin/` and `Web-Bridge.pyz` are generated distributions.
 
 ```sh
 cd source
 npm ci
-npm run check:repo
 npm run build
 npm run validate
 npm test
@@ -109,6 +147,6 @@ python -m pytest -q bridge/tests
 python scripts/package-release.py
 ```
 
-Use `python3` on macOS/Linux where needed. Outputs go to `source/dist/` and `source/outputs/`. `python scripts/export-repository.py` exports sanitized source and refuses to overwrite an existing destination. Large repository illustrations stay outside the portable setup payload.
+Use `python3` on macOS/Linux where needed. Outputs go to `source/dist/` and `source/outputs/`. `python scripts/export-repository.py` exports sanitized source to a new destination. Images stay in the repository; portable setup packages omit the illustrations to keep the gateway payload small.
 
-Version 3.2 source and packaged artifacts do not automatically update an already installed private Site/plugin: deployment is a separate step. Preserve an existing deployment's identity and secrets during an upgrade. Never publish runtime state, keys or selected project data. Use only projects and targets you own or are authorized to work on. This project has not been independently security audited.
+This README is the only explanatory Markdown file. `SKILL.md` files are executable workflow instructions required by the skills and setup plugin. Code, tests and tool schemas remain the implementation reference. No separate docs, guides or planning records are maintained.

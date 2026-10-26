@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {readmePath} from './readme.mjs';
 
 const required = [
-  'README.md', 'SECURITY.md', 'LICENSE', '.gitignore',
+  'LICENSE', '.gitignore',
   'bridge/launch.py', 'bridge/BRIDGE_TOOLS.json',
   'bridge/server/companion.py', 'worker/runtime.js',
   'scripts/build.mjs', 'scripts/package-setup.py',
@@ -18,8 +19,5 @@ assert.equal(pkg.version, companion.version, 'Companion version differs');
 assert.equal(pkg.version, tools.bridge_version, 'MCP catalog version differs');
 assert.ok(Array.isArray(tools.tools) && tools.tools.length > 0, 'No tools registered');
 
-const packaging = readFileSync('scripts/package-setup.py', 'utf8');
-for (const file of ['SECURITY.md', 'README.md']) {
-  assert.ok(packaging.includes("'" + file + "'"), `Packaging omits ${file}`);
-}
+assert.ok(existsSync(readmePath()), 'Missing main README');
 console.log(`Source verification succeeded (v${pkg.version}; ${tools.tools.length} MCP tools).`);
