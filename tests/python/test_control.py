@@ -149,9 +149,18 @@ def test_original_svg_geometry_is_used_without_example_findings():
     original_root = ET.fromstring(original)
     dashboard_root = ET.fromstring(dashboard)
     assert original_root.get('viewBox') == dashboard_root.get('viewBox') == '0 0 1310 1105'
-    paths = lambda root: [e.attrib['d'] for e in root.iter()
-                          if e.tag == 'path' and 'd' in e.attrib]
+    # The preserved source SVG is unnamespaced, while the standalone
+    # dashboard SVG declares the standard SVG XML namespace. ElementTree
+    # expands the latter to "{http://www.w3.org/2000/svg}path".
+    # Compare local element names so this checks geometry, not serialization.
+    def paths(root):
+        return [
+            element.attrib['d']
+            for element in root.iter()
+            if element.tag.rsplit('}', 1)[-1] == 'path' and 'd' in element.attrib
+        ]
     assert len(paths(original_root)) == 78
+    assert len(paths(dashboard_root)) == 78
     assert paths(original_root) == paths(dashboard_root)
     for sample in ('2,087', '1,227', '378', 'Snyk Scan', 'At Risk'):
         assert sample not in dashboard
