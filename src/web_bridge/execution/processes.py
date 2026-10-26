@@ -93,27 +93,33 @@ class WindowsGroup:
         api.OpenThread.argtypes = [w.DWORD, w.BOOL, w.DWORD]
         api.OpenThread.restype = w.HANDLE
         api.ResumeThread.argtypes = [w.HANDLE]
+        api.ResumeThread.restype = w.DWORD
         snapshot = api.CreateToolhelp32Snapshot(4, 0)
         entry = THREAD()
         entry.size = ctypes.sizeof(entry)
         resumed = False
         try:
+            # The first enumerated thread is not necessarily the suspended
+            # primary thread. ResumeThread returns its *previous* suspend
+            # count; zero is a valid call but does not resume anything.
             ok = api.Thread32First(snapshot, ctypes.byref(entry))
             while ok:
                 if entry.owner == process.pid:
                     thread = api.OpenThread(2, False, entry.thread)
                     if thread:
                         try:
-                            resumed = api.ResumeThread(thread) != 0xFFFFFFFF
+                            previous = api.ResumeThread(thread)
+                            if previous != 0xFFFFFFFF and previous > 0:
+                                resumed = True
+                                break
                         finally:
                             api.CloseHandle(thread)
-                    break
                 ok = api.Thread32Next(snapshot, ctypes.byref(entry))
         finally:
             api.CloseHandle(snapshot)
         if not resumed:
             self.close()
-            raise OSError("Unable to resume owned command.")
+            raise OSError("Unable to resume suspended Windows command.")
 
     def kill(self):
         with self.lock:

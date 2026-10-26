@@ -32,6 +32,31 @@ Core features need no pip installation or extraction. Keep the companion running
 
 ![Build, deploy and connect](images/06-build-deploy-connect.png)
 
+## Operating-system setup
+
+The same Python companion runs on all three desktop platforms. **Python 3.10+** is sufficient for core features; **Python 3.11+** is required for the optional MCP adapters and agent. Docker commands require a separately running **Linux-container** engine. Do not run the companion as root or as a Windows service for desktop-related behavior.
+
+| Platform | Prepare Python and tunnel | Docker |
+| --- | --- | --- |
+| Windows 10/11 | Install Python using the official installer and `cloudflared` using `winget install Cloudflare.cloudflared` | Docker Desktop with Linux containers and WSL2 enabled |
+| macOS (Apple Silicon / Intel) | `brew install python@3.12 cloudflared` | Install Docker Desktop for Mac, then start the engine |
+| Debian / Ubuntu | Install Python 3 and venv from your distribution; install `cloudflared` from Cloudflare's official repository/package | Install Docker Engine and its CLI using Docker's official apt repository |
+| Arch / EndeavourOS / Manjaro | `sudo pacman -S python cloudflared` when available in the configured repositories; otherwise use Cloudflare's official release | `sudo pacman -S docker`; start `docker.service` with systemd |
+
+For Debian/Arch Docker engine setup, follow the respective upstream or distribution instructions; adding your user to the `docker` group effectively grants root-level control. Rootless Docker is preferable when it satisfies your environment requirements. Use your user's local Docker context; remote TCP Docker contexts are rejected by the bridge.
+
+Launch a downloaded release from a terminal:
+
+```text
+Windows PowerShell:  py -3 .\\Web-Bridge.pyz
+macOS:              python3 Web-Bridge.pyz
+Debian / Arch:      python3 Web-Bridge.pyz
+```
+
+On macOS, if the downloaded archive is blocked by quarantine/Gatekeeper, verify its origin and SHA-256 against the published release before permitting execution. On Linux, install system prerequisites using the system package manager; avoid `sudo pip install` into a managed Python environment. The companion stores state separately from its extracted archive in the per-user application-state directory.
+
+You can check the core installation without starting network listeners using `python3 Web-Bridge.pyz --about` (or `py -3` on Windows). Run `python3 Web-Bridge.pyz --local-only` to verify the local control panel before enabling a tunnel.
+
 ## Install and share simply
 
 **Already have a shared plugin?** Open ChatGPT's **Plugins**, find it under your workspace or **Shared with me**, open it and install it. Start a new chat, type `@`, select the bridge, and follow its connection prompts. Plugin availability and sharing depend on your account/workspace. See [OpenAI's installation guide](https://learn.chatgpt.com/docs/plugins).

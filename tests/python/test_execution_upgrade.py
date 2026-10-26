@@ -67,3 +67,17 @@ def test_host_launch_preserves_shell_alias(tmp_path):
         assert result['request']['argv'][0]=='/bin/sh'
         assert result['state']=='failed' and result['exit_code']==7
     finally:c.close()
+
+@pytest.mark.skipif(sys.platform=='win32', reason='POSIX child process groups')
+def test_background_child_inheriting_stdout_does_not_stall_parent_completion(tmp_path):
+    c, root = fixture(tmp_path)
+    try:
+        command = "import subprocess,sys;subprocess.Popen([sys.executable,'-c','import time;time.sleep(5)']);print('parent-finished',flush=True)"
+        start = time.monotonic()
+        result = finish(c, [sys.executable, '-c', command], timeout=10)
+        assert result['state'] == 'completed', result['output']
+        assert result['success'] is True
+        assert 'parent-finished' in result['output']
+        assert time.monotonic() - start < 4.5
+    finally:
+        c.close()

@@ -66,6 +66,7 @@ def minimal_environment():
             "LOCALAPPDATA",
             "TEMP",
             "TMP",
+            "DOCKER_CONFIG",
         )
     }
     result.update({"PYTHONNOUSERSITE": "1", "PYTHONIOENCODING": "utf-8"})
@@ -360,6 +361,8 @@ class Jobs:
         )
         if "exit_code" in job:
             result["exit_code"] = job["exit_code"]
+        if job.get("output_stream_open"):
+            result["output_stream_open"] = True
         return result
 
     def persist(self, job, settled=None):
@@ -996,21 +999,65 @@ class Jobs:
             timer.daemon = True
             timer.start()
             captured = bytearray()
+            output_done = threading.Event()
+            output_stop = threading.Event()
+            output_failed = threading.Event()
+            output_errors = []
+
+            def capture_output():
+                # A descendant can retain stdout after its parent exits.
+                # Never let pipe EOF determine the command's terminal state.
+                try:
+                    while not output_stop.is_set():
+                        block = process.stdout.read1(4096)
+                        if not block:
+                            break
+                        with self.lock:
+                            if output_stop.is_set():
+                                break
+                            room = max(0, 64_000 - len(captured))
+                            if room:
+                                captured.extend(block[:room])
+                                job["output"] = captured.decode("utf-8", errors="replace")
+                            if len(block) > room:
+                                job["truncated"] = True
+                            if room or not job.get("output_saved"):
+                                self.persist(job)
+                                job["output_saved"] = True
+                except Exception as exc:
+                    # This thread is a required part of durable execution:
+                    # losing its receipt must abort the command rather than
+                    # silently waiting for a possibly long-running child.
+                    output_errors.append(exc)
+                    output_failed.set()
+                finally:
+                    output_done.set()
+
+            threading.Thread(
+                target=capture_output, name="bridge-output-" + key[:8], daemon=True
+            ).start()
             while True:
-                block = process.stdout.read1(4096)
-                if not block:
+                if output_failed.is_set():
+                    raise output_errors[0]
+                try:
+                    process.wait(timeout=0.1)
                     break
+                except subprocess.TimeoutExpired:
+                    continue
+            # The command has exited. Clean up descendants before reading
+            # staged results so inherited pipes and late writes cannot block
+            # finalization or race file synchronization.
+            if job["group"]:
+                job["group"].close()
+                job["group"] = None
+            elif os.name != "nt":
+                kill_posix_group(process.pid)
+            if not output_done.wait(timeout=1.5):
+                output_stop.set()
                 with self.lock:
-                    room = 64_000 - len(captured)
-                    if room > 0:
-                        captured.extend(block[:room])
-                        job["output"] = captured.decode("utf-8", errors="replace")
-                    if len(block) > room:
-                        job["truncated"] = True
-                    if room > 0 or not job.get("output_saved"):
-                        self.persist(job)
-                        job["output_saved"] = True
-            process.wait()
+                    job["output_stream_open"] = True
+            if output_failed.is_set():
+                raise output_errors[0]
             execution_complete = True
             with self.lock:
                 job["exit_code"] = process.returncode

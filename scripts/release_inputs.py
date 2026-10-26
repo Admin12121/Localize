@@ -84,7 +84,12 @@ def source_payload():
         "drizzle.config.ts",
     ):
         entries[name] = clean_bytes(ROOT / name)
-    entries["README.md"] = portable_readme()
+    # The source repository retains the architecture illustrations referenced
+    # by its canonical README. Runtime/setup bundles omit them.
+    for path in sorted((ROOT / "images").glob("*.png")):
+        if path.is_file() and not path.is_symlink():
+            entries[path.relative_to(ROOT).as_posix()] = path.read_bytes()
+    entries["README.md"] = clean_bytes(ROOT / "README.md")
     manifest = json.loads((ROOT / ".openai/hosting.json").read_text(encoding="utf-8"))
     manifest.pop("project_id", None)
     entries[".openai/hosting.json"] = (json.dumps(manifest, indent=2) + "\n").encode()

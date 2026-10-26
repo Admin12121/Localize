@@ -384,10 +384,22 @@ class DockerProject:
             try:
                 candidate["endpoint"] = self._endpoint(context)
                 self._check_engine()
-                if previous and all(
-                    previous.get(key) == candidate[key]
-                    for key in ("context", "endpoint", "root", "identity", "workdir")
-                ):
+                if previous and previous.get("container_id"):
+                    # Never silently attach an existing container to different
+                    # image, network or resource settings. Docker cannot update
+                    # these reliably through a saved bridge profile.
+                    pinned = (
+                        "docker_config", "context", "endpoint", "root",
+                        "identity", "workdir", "image", "network",
+                        "cpus", "memory", "pids_limit",
+                    )
+                    if any(previous.get(key) != candidate[key] for key in pinned):
+                        raise WorkspaceError(
+                            "The selected Docker container still uses the previous "
+                            "settings. Stop/remove the bridge-owned container, or "
+                            "detach the existing selection locally before changing "
+                            "the image, context, mount, network or resource limits."
+                        )
                     for key in ("container_id", "mode", "allow_broad_access"):
                         candidate[key] = previous.get(key)
                 self._workspace = workspace
@@ -624,6 +636,16 @@ class DockerProject:
                     container_id=info["Id"], mode="attached", allow_broad_access=broad
                 )
                 self._save()
+            elif action == "detach":
+                # Never unbind a container with an active per-command cancellation
+                # identity: doing so could make its process group unrecoverable.
+                if self._jobs:
+                    raise WorkspaceError(
+                        "Finish or cancel active Docker commands before detaching."
+                    )
+                # Detaching only clears bridge selection, not the container.
+                config.update(container_id=None, mode=None, allow_broad_access=False)
+                self._save()
             elif action in ("start", "stop", "remove", "logs"):
                 info = self._selected(workspace)
                 if action in ("stop", "remove") and not self._is_owned(info):
@@ -652,6 +674,9 @@ class DockerProject:
     def validate_workspace(self, workspace):
         with self._lock:
             self._check_workspace(workspace)
+            # Restore the authoritative Workspace object when a previously
+            # configured Docker project is reopened after companion restart.
+            self._workspace = workspace
             return True
 
     def build_command(self, job_id, argv, cwd=""):

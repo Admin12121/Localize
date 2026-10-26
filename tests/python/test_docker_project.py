@@ -247,3 +247,42 @@ def test_real_docker_persistent_mount_and_attached_command_cancellation(tmp_path
                 try: process.communicate(timeout=5)
                 except subprocess.TimeoutExpired: process.kill(); process.communicate(timeout=5)
 
+
+
+def test_reconfiguration_cannot_silently_reuse_container_with_different_settings(project):
+    docker, workspace, _, _ = project
+    configure(project)
+    docker.action('create', workspace)
+    original = dict(docker._config)
+    for change in ({'image': 'python:3.12-alpine'}, {'network': 'none'},
+                   {'cpus': 3}, {'memory': '4g'}, {'pids_limit': 512},
+                   {'workdir': '/source'}):
+        with pytest.raises(WorkspaceError, match='previous settings'):
+            docker.configure({'context': 'desktop-linux', 'image': 'node:24-alpine',
+                              **change}, workspace)
+        assert docker._config == original
+    assert configure(project)['container_id'] == original['container_id']
+
+
+def test_detach_preserves_managed_container_and_allows_new_settings(project):
+    docker, workspace, calls, _ = project
+    configure(project)
+    docker.action('create', workspace)
+    calls.clear()
+    result = docker.action('detach', workspace)
+    assert result['container_id'] is None
+    assert not any(args[:2] in (['container', 'stop'], ['container', 'rm']) for args in calls)
+    assert docker.configure({'context': 'desktop-linux', 'image': 'python:3.12-alpine'}, workspace)['image'] == 'python:3.12-alpine'
+
+
+def test_restart_restores_workspace_reference_for_subdirectories(project):
+    docker, workspace, _, state = project
+    (workspace.root / 'nested').mkdir()
+    configure(project)
+    docker.action('attach', workspace, container='existing')
+    restarted = DockerProject(docker.path.parent)
+    restarted._invoke = docker._invoke
+    restarted._binary = 'docker'
+    restarted.validate_workspace(workspace)
+    command = restarted.build_command('after-restart', ['pwd'], 'nested')
+    assert '/workspace/nested' in command

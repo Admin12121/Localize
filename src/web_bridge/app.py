@@ -182,9 +182,10 @@ class Companion(
             if selected and self.docker_project._config:
                 try:
                     self.docker_project.validate_workspace(selected)
+                    self.docker_state = self.docker_project.status()
                 except WorkspaceError:
                     self.docker_state = {
-                        "configured": False,
+                        "configured": True,
                         "ready": False,
                         "error": "Docker mapping belongs to another project. Configure the selected project locally.",
                     }
