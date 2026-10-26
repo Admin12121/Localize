@@ -8,67 +8,66 @@ Read and update files, run approved host or Docker commands, connect selected sk
 
 ![System architecture](images/01-system-architecture.png)
 
-## Run Localize from GitHub
+## Install once, then run `localizeit`
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) once, then run this command on Windows, macOS or Linux:
+**Windows PowerShell:**
 
-```sh
-uvx --from https://github.com/Admin12121/Localize/releases/download/v3.2.0/localizeit-3.2.0-py3-none-any.whl localizeit
+```powershell
+irm https://github.com/Admin12121/Localize/releases/download/v3.2.0/install.ps1 | iex
 ```
 
-The package and primary command are both **`localizeit`**. This downloads the versioned wheel from [GitHub Releases](https://github.com/Admin12121/Localize/releases/tag/v3.2.0), manages Python in an isolated environment, opens the local control panel and starts the authenticated tunnel. No repository clone, Node.js, global Python package installation or PyPI account is required. uv itself must be installed first.
+**macOS / Linux:**
 
-For a persistent installation, install the same GitHub wheel once, then use `localizeit`:
+```sh
+curl -fsSL https://github.com/Admin12121/Localize/releases/download/v3.2.0/install.sh | sh
+```
+
+After installation, open a new terminal once and run from any folder:
+
+```sh
+localizeit
+```
+
+The installer prepares uv if needed, verifies the GitHub wheel against the release SHA-256 manifest, installs a managed Python environment, checks the installed command and updates your user's command path. No administrator access, repository clone, Node.js, PyPI account or npm account is required. It prints what it is doing and stops on a failed download, checksum or installation. You can [inspect the Windows installer](scripts/install.ps1) or [macOS/Linux installer](scripts/install.sh) before running it. Re-run the installer to repair or replace this version.
+
+`localizeit` opens the local panel and starts the authenticated tunnel. It reuses an installed cloudflared, or downloads the official release into a private user cache and verifies its published SHA-256 before use. Automatic tunnel preparation supports Windows x64, macOS Intel/Apple Silicon, and Linux x64/arm64; other architectures can use an existing supported cloudflared installation. Docker must be installed and running separately only when you choose Docker execution.
+
+Use `localizeit --local-only` for local controls without a tunnel/download. `localizeit --about` and `localizeit --help` also skip tunnel preparation. `localize` remains an optional alias; `web-bridge` is the legacy command with its explicit `--tunnel` behavior. Existing Web-Bridge 3.2 runtime state remains compatible.
+
+For users who already have uv, the direct alternative is:
 
 ```sh
 uv tool install https://github.com/Admin12121/Localize/releases/download/v3.2.0/localizeit-3.2.0-py3-none-any.whl
 localizeit
 ```
 
-If your terminal cannot find the installed command, run `uv tool update-shell` and reopen the terminal. To replace an older installation, repeat the install command with `--force`. `localize` is an optional alias for `localizeit`; `web-bridge` is the legacy command and retains its explicit `--tunnel` behavior. Runtime state and permissions remain compatible with Web-Bridge 3.2.
-
-The launcher reuses an installed cloudflared, or downloads the official release into a private user cache and verifies its published SHA-256 before use. Later launches reuse that verified cache. Automatic tunnel preparation supports Windows x64, macOS Intel/Apple Silicon, and Linux x64/arm64; other architectures can use an existing supported cloudflared installation. No administrator install is needed.
-
-Append `--local-only` to the launch command for local controls without a tunnel/download. `--about` and `--help` also skip tunnel preparation. Docker must be installed and running separately only when you choose Docker execution.
-
-Distribution currently uses GitHub Releases. Bare `uvx localizeit` searches PyPI and is not the documented installation route. Use the full GitHub command above, or download the wheel from the release and run `uvx --from ./localizeit-3.2.0-py3-none-any.whl localizeit`. Release assets include `SHA256SUMS` for download verification.
+The primary package and command are both **`localizeit`**. Distribution uses [GitHub Releases](https://github.com/Admin12121/Localize/releases/tag/v3.2.0); bare `uvx localizeit` searches PyPI and is not the installation route. Individual release assets have SHA-256 checksums in `SHA256SUMS`. To remove the installed commands later, use `uv tool uninstall localizeit`; saved project configuration remains in your per-user runtime folder.
 
 ## Connect to ChatGPT
 
 1. If you already have access to a deployed bridge plugin, install it from ChatGPT **Plugins** and open its Site connection page. Otherwise, download `web-bridge-setup-plugin.zip` from the GitHub release and use it in a Plugin Creator/Sites-enabled chat with build tools to create your own private Site and generated plugin. Follow the [setup skill](Plugin/skills/setup-web-bridge/SKILL.md). Installing a ZIP alone does not deploy or connect the bridge.
-2. Start the companion with the `uvx` command above, or `localizeit` after persistent installation. Keep it running while ChatGPT works.
+2. Install once as above, then start the companion with `localizeit` from any folder. Keep it running while ChatGPT works.
 3. Open the printed local panel and enter its control code. Select your project, permissions, command environment, shell and timeouts. Host commands need exact approval for each command.
 4. Save the printed remote HTTPS endpoint/key only in your private Site's connection form. The local control panel remains on loopback and must never be tunneled.
 5. Select the generated plugin in ChatGPT using `@`. Ask it to call `bridge_status`, read a known project file and submit a harmless command. Inspect the actual result and intended effect before relying on the connection.
 
-The companion launcher and the ChatGPT plugin have separate setup steps. A local command does not create or publish a Site/plugin. The standalone `Web-Bridge.pyz` release remains available for users who prefer to manage Python and cloudflared themselves; see the operating-system setup below.
+The companion launcher and the ChatGPT plugin have separate setup steps. A local command does not create or publish a Site/plugin. The standalone `Web-Bridge.pyz` release remains available for users who prefer to manage Python and cloudflared themselves; see the platform requirements below.
 
 ![Build, deploy and connect](images/06-build-deploy-connect.png)
 
-## Operating-system setup
+## Platform requirements
 
-The same Python companion runs on all three desktop platforms. The manual Python/cloudflared steps below apply only to the standalone `.pyz` alternative; the recommended GitHub/uv launcher manages those dependencies as described above. **Python 3.10+** is sufficient for core features; **Python 3.11+** is required for the optional MCP adapters and agent. Docker commands require a separately running **Linux-container** engine. Do not run the companion as root or as a Windows service for desktop-related behavior.
+| Platform | Installer requirements |
+| --- | --- |
+| Windows 10/11 | Built-in Windows PowerShell 5.1+ and HTTPS access to GitHub/Astral |
+| macOS Intel / Apple Silicon | Built-in `sh` and `curl`, plus HTTPS access to GitHub/Astral |
+| Linux x64 / arm64 | `sh`, `curl`, and `sha256sum` or `shasum`, plus HTTPS access to GitHub/Astral |
 
-| Platform | Prepare Python and tunnel | Docker |
-| --- | --- | --- |
-| Windows 10/11 | Install Python using the official installer and `cloudflared` using `winget install Cloudflare.cloudflared` | Docker Desktop with Linux containers and WSL2 enabled |
-| macOS (Apple Silicon / Intel) | `brew install python@3.12 cloudflared` | Install Docker Desktop for Mac, then start the engine |
-| Debian / Ubuntu | Install Python 3 and venv from your distribution; install `cloudflared` from Cloudflare's official repository/package | Install Docker Engine and its CLI using Docker's official apt repository |
-| Arch / EndeavourOS / Manjaro | `sudo pacman -S python cloudflared` when available in the configured repositories; otherwise use Cloudflare's official release | `sudo pacman -S docker`; start `docker.service` with systemd |
+The installer selects Python **3.12** automatically; you do not need to find a Python script or manage a virtual environment. Install and run as your regular user. Windows ARM requires an existing supported cloudflared installation for tunnel use.
 
-For Debian/Arch Docker engine setup, follow the respective upstream or distribution instructions; adding your user to the `docker` group effectively grants root-level control. Rootless Docker is preferable when it satisfies your environment requirements. Use your user's local Docker context; remote TCP Docker contexts are rejected by the bridge.
+Docker is optional. For Docker execution, start Docker Desktop with Linux containers on Windows/macOS, or a local Docker Engine on Linux. Use your own local Docker context; remote TCP contexts are rejected. The Linux `docker` group effectively grants root-level control; use rootless Docker where it meets your needs.
 
-Launch a downloaded release from a terminal:
-
-```text
-Windows PowerShell:  py -3 .\Web-Bridge.pyz
-macOS:              python3 Web-Bridge.pyz
-Debian / Arch:      python3 Web-Bridge.pyz
-```
-
-On macOS, if the downloaded archive is blocked by quarantine/Gatekeeper, verify its origin and SHA-256 against the published release before permitting execution. On Linux, install system prerequisites using the system package manager; avoid `sudo pip install` into a managed Python environment. The companion stores state separately from its extracted archive in the per-user application-state directory.
-
-You can check the core installation without starting network listeners using `python3 Web-Bridge.pyz --about` (or `py -3` on Windows). Run `python3 Web-Bridge.pyz --local-only` to verify the local control panel before enabling a tunnel.
+The standalone `.pyz` is a compatibility option for users who manage Python and cloudflared themselves. It is not needed for the recommended installer/`localizeit` workflow. Runtime state lives in your per-user application-state directory, separately from release downloads.
 
 ## Install and share simply
 
@@ -76,8 +75,8 @@ You can check the core installation without starting network listeners using `py
 
 On **each person's computer**:
 
-1. Install uv once.
-2. Run the GitHub `uvx` command from **Run Localize from GitHub** above. For persistent installation, install that same wheel with `uv tool install` and run `localizeit`. The standalone alternative is `Web-Bridge.pyz` with Python/cloudflared installed as described above.
+1. Run the Windows or macOS/Linux installer from **Install once, then run `localizeit`** above.
+2. Open a new terminal and run `localizeit`. The standalone `.pyz` alternative is for users who prefer to manage Python/cloudflared themselves.
 3. Unlock the printed local panel, select the project and permissions, and choose the command environment. Docker is optional unless you choose Docker execution.
 4. In the authorized Site connection page, save **your own** printed remote endpoint and connection key. Keep the companion running.
 5. In a new ChatGPT chat, select the installed bridge with `@` and send:
@@ -227,7 +226,7 @@ npm ci
 npm run build
 npm run validate
 npm test
-python -m pip install pytest build -r requirements/integrations.txt -r requirements/agent.txt
+python -m pip install pytest build uv -r requirements/integrations.txt -r requirements/agent.txt
 python -m pytest -q tests/python
 python -m build --wheel --outdir dist/release
 python scripts/package-release.py

@@ -24,6 +24,8 @@ assets = {
     "web-bridge-setup-plugin.zip": (out / "web-bridge-setup-plugin.zip").read_bytes(),
     "Web-Bridge-GitHub-Source.zip": (out / "Web-Bridge-GitHub-Source.zip").read_bytes(),
     "LICENSE": Path("LICENSE").read_bytes(),
+    "install.ps1": (ROOT / "scripts/install.ps1").read_bytes().replace(b"\r\n", b"\n"),
+    "install.sh": (ROOT / "scripts/install.sh").read_bytes().replace(b"\r\n", b"\n"),
     "README.md": portable_readme(),
 }
 # Include the installable CLI wheel when built; standalone bundle remains available.
@@ -35,6 +37,10 @@ version = json.loads(
 wheel = out / f"localizeit-{version}-py3-none-any.whl"
 if wheel.is_file():
     assets[wheel.name] = wheel.read_bytes()
+# Publish the exact bytes that the manifest and combined archive describe.
+for name, data in assets.items():
+    (out / name).write_bytes(data)
+
 checksums = "".join(
     hashlib.sha256(data).hexdigest() + "  " + name + "\n"
     for name, data in sorted(assets.items())
