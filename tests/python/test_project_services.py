@@ -13,13 +13,19 @@ def ready(tmp_path,**permissions):
     c.configure(root=str(root),read=True,write=True,execution=True,host=True,profile={'environment':'host','shell':'powershell' if os.name=='nt' else 'sh'},**permissions)
     return c,root
 
-def wait(c,job):
-    end=time.monotonic()+10
+def wait(c,job,timeout=10):
+    end=time.monotonic()+timeout
     while time.monotonic()<end:
         result=c.command_status(job['job_id'])
         if result['state'] not in ('pending','approved','running'):return result
         time.sleep(.02)
-    pytest.fail('job did not terminate')
+    result=c.command_status(job['job_id'])
+    pytest.fail(
+        f"Job did not terminate within {timeout}s: state={result['state']}, "
+        f"execution={result.get('execution')}, "
+        f"output={result.get('output', '')[-2000:]!r}, "
+        f"receipt_error={result.get('receipt_error')!r}"
+    )
 
 def test_profile_selects_host_and_shell_preserves_native_failure(tmp_path):
     c,root=ready(tmp_path)
@@ -85,7 +91,8 @@ def test_shell_commands_create_files_with_real_windows_adapters(tmp_path,shell,c
     c,root=ready(tmp_path)
     try:
         job=c.command_request(command=command,shell=shell,idempotency_key='shell-real-file',workspace_id=c.workspace_id)
-        c.approve_command(job['job_id'],True);result=wait(c,job)
+        c.approve_command(job['job_id'],True)
+        result=wait(c,job,timeout=30 if shell=='powershell' else 10)
         assert result['success'] is True,result['output']
         assert (root/filename).read_text(encoding='utf-8-sig').strip()=='done'
     finally:c.close()

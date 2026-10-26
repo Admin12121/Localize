@@ -279,21 +279,38 @@ def test_long_callback_renews_leases_and_invalidation_stops_further_execution(tm
         release.wait(2)
         return {'calls': [{'name': 'write_file', 'arguments': {}}], 'usage': {'input_tokens': 1, 'output_tokens': 1}}
     runner, task = make(tmp_path, provider, lambda *a, **kw: executed.append(a))
+    renewed = threading.Event()
+    original_renew = runner.store.renew_workspace
+
+    def observed_renew(workspace, owner, ttl=60):
+        result = original_renew(workspace, owner, ttl)
+        if result:
+            renewed.set()
+        return result
+
+    monkeypatch.setattr(runner.store, 'renew_workspace', observed_renew)
     runner.configure(CONFIG)
-    started = runner.start(task, WS)
-    assert entered.wait(1)
-    runner.store.claim_workspace(WS, started['owner'], .03)
-    time.sleep(.07)
-    with pytest.raises(ValueError, match='lease'):
+    try:
+        started = runner.start(task, WS)
+        assert entered.wait(2)
+        # Wait for the actual heartbeat rather than assuming the macOS runner
+        # will schedule a thread within a 30 ms sleep under CI load.
+        renewed.clear()
+        assert renewed.wait(2), 'Workspace renewal heartbeat did not run'
+        with pytest.raises(ValueError, match='lease'):
+            runner.store.claim_workspace(WS, 'chat', 1)
+        runner.store.invalidate_workspace(WS)
         runner.store.claim_workspace(WS, 'chat', 1)
-    runner.store.invalidate_workspace(WS)
-    time.sleep(.03)
-    runner.store.claim_workspace(WS, 'chat', 1)
-    release.set()
-    assert wait(runner, task)['status'] == 'partial'
-    assert executed == []
-    runner.close()
-    runner.store.close()
+        assert runner.runs[task]['cancel'].wait(2), (
+            'Runner did not detect the invalidated workspace lease'
+        )
+        release.set()
+        assert wait(runner, task)['status'] == 'partial'
+        assert executed == []
+    finally:
+        release.set()
+        runner.close()
+        runner.store.close()
 
 
 def test_lost_response_mutation_is_not_replayed_with_fresh_session_metadata(tmp_path,monkeypatch):
