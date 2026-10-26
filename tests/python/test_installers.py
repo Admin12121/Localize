@@ -10,7 +10,7 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-WHEEL = 'localizeit-3.2.2-py3-none-any.whl'
+WHEEL = 'localizeit-3.2.3-py3-none-any.whl'
 
 
 @pytest.mark.parametrize('checksum', ['valid', 'mismatch', 'missing', 'duplicate'])
@@ -38,7 +38,7 @@ def test_installer_verifies_release_before_registering_command(tmp_path, checksu
         wrapper.write_text('''$ErrorActionPreference = 'Stop'
 function Invoke-WebRequest {
     param($UseBasicParsing, $Uri, $OutFile, $TimeoutSec)
-    if (-not $Uri.StartsWith('https://github.com/Admin12121/Localize/releases/download/v3.2.2/')) { throw 'Unexpected download host.' }
+    if (-not $Uri.StartsWith('https://github.com/Admin12121/Localize/releases/download/v3.2.3/')) { throw 'Unexpected download host.' }
     Copy-Item -LiteralPath (Join-Path $env:LOCALIZEIT_FIXTURE_DIR ([IO.Path]::GetFileName(([Uri]$Uri).AbsolutePath))) -Destination $OutFile
 }
 & $env:LOCALIZEIT_INSTALLER -NoModifyPath -Python $env:LOCALIZEIT_PYTHON
@@ -51,7 +51,7 @@ function Invoke-WebRequest {
 import os, pathlib, shutil, sys
 args=sys.argv[1:]
 url=next(arg for arg in args if arg.startswith('https://'))
-assert url.startswith('https://github.com/Admin12121/Localize/releases/download/v3.2.2/')
+assert url.startswith('https://github.com/Admin12121/Localize/releases/download/v3.2.3/')
 shutil.copyfile(pathlib.Path(os.environ['LOCALIZEIT_FIXTURE_DIR'])/url.rsplit('/',1)[1],args[args.index('--output')+1])
 ''',encoding='utf-8')
         curl.chmod(0o700)
@@ -68,5 +68,5 @@ shutil.copyfile(pathlib.Path(os.environ['LOCALIZEIT_FIXTURE_DIR'])/url.rsplit('/
     assert executable.is_file()
     about = subprocess.run([str(executable),'--about'],env=env,capture_output=True,text=True,encoding='utf-8',timeout=15)
     assert about.returncode == 0,about.stderr
-    assert json.loads(about.stdout)['version']=='3.2.2'
+    assert json.loads(about.stdout)['version']=='3.2.3'
     assert 'localizeit' in result.stdout

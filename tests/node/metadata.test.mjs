@@ -44,10 +44,23 @@ test('release version remains consistent across installers, metadata, gateway, a
   for (const path of files) {
     const text = readFileSync(path, 'utf8');
     assert(text.includes(version), path + ' does not reference current ' + version);
-    assert(!/3\\.2\\.(?:0|1)(?!\\d)/.test(text), path + ' references a stale Localize release');
+    for (const old of ['3.2.0', '3.2.1', '3.2.2']) {
+      assert(!text.includes(old), path + ' references outdated Localize ' + old);
+    }
   }
   const installUrl = 'releases/download/v' + version;
   for (const path of ['scripts/install.ps1', 'scripts/install.sh', 'README.md']) {
     assert(readFileSync(path, 'utf8').includes(installUrl), path + ' uses an old release URL');
   }
+});
+
+test('release requires successful CI for the tagged commit', () => {
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  assert(ci.includes('python -m pytest -q tests/python'));
+  assert(workflow.includes('Require green CI for exact tagged commit'));
+  assert(workflow.includes('head_sha=$commit'));
+  assert(workflow.includes('run["head_branch"] == "main"'));
+  assert(workflow.includes('run["conclusion"] == "success"'));
+  assert(!workflow.includes('python -m pytest -q tests/python'));
 });

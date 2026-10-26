@@ -20,9 +20,19 @@ def wait(c,job,timeout=10):
         if result['state'] not in ('pending','approved','running'):return result
         time.sleep(.02)
     result=c.command_status(job['job_id'])
+    internal=c.jobs.items.get(job['job_id'], {})
+    process=internal.get('process')
+    process_status=process.poll() if process is not None else 'not launched'
+    try:
+        generated=sorted(item.name for item in c.workspace.root.glob('resume-*.txt'))
+    except OSError:
+        generated=['unavailable']
     pytest.fail(
         f"Job did not terminate within {timeout}s: state={result['state']}, "
         f"execution={result.get('execution')}, "
+        f"process_poll={process_status}, "
+        f"job_object_owned={bool(internal.get('group'))}, "
+        f"created_files={generated}, "
         f"output={result.get('output', '')[-2000:]!r}, "
         f"receipt_error={result.get('receipt_error')!r}"
     )
@@ -109,6 +119,7 @@ def test_powershell_repeated_owned_launches_are_not_left_suspended(tmp_path):
     try:
         for number in range(5):
             name = f'resume-{number}.txt'
+            print(f'Windows PowerShell iteration {number + 1}/5', flush=True)
             job = c.command_request(
                 command=f"Set-Content -LiteralPath '{name}' -Value 'started'",
                 shell='powershell',
@@ -117,6 +128,7 @@ def test_powershell_repeated_owned_launches_are_not_left_suspended(tmp_path):
             )
             c.approve_command(job['job_id'], True)
             result = wait(c, job, timeout=20)
+            print(f'Iteration {number + 1}: exit={result.get("exit_code")}', flush=True)
             assert result['state'] == 'completed', result
             assert result['success'] is True, result
             assert (root / name).read_text(encoding='utf-8-sig').strip() == 'started'

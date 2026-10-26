@@ -75,7 +75,7 @@ test('Site tools delegate to real authenticated Python bridge and real HTTP GET/
   globalThis.fetch=(url,options)=>realFetch(url==='https://fixture.trycloudflare.com/mcp'?`http://127.0.0.1:${fixture.bridge_port}/mcp`:url,options);
   try{
     await save(env,'https://fixture.trycloudflare.com/mcp',token);
-    const status=(await call(env,'bridge_status')).result;assert.equal(status.isError,false);assert.equal(JSON.parse(status.content[0].text).version,'3.2.2');assert.equal(JSON.parse(status.content[0].text).creator,'admin12121');assert.equal(JSON.parse(status.content[0].text).license,'MIT');
+    const status=(await call(env,'bridge_status')).result;assert.equal(status.isError,false);assert.equal(JSON.parse(status.content[0].text).version,'3.2.3');assert.equal(JSON.parse(status.content[0].text).creator,'admin12121');assert.equal(JSON.parse(status.content[0].text).license,'MIT');
     assert.equal((await call(env,'workspace_list')).result.isError,true);
     let result=(await call(env,'list_targets')).result;assert.equal(result.isError,false,JSON.stringify(result));assert.equal(JSON.parse(result.content[0].text).targets[0].origin,`http://127.0.0.1:${fixture.challenge_port}`);
     result=(await call(env,'http_request',{target:'lab'})).result;assert.equal(JSON.parse(result.content[0].text).status,200);
