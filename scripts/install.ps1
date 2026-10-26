@@ -27,7 +27,8 @@ if (-not $uv) {
     try {
         if (-not $env:UV_INSTALL_DIR) { $env:UV_INSTALL_DIR = Join-Path $HOME '.local\bin' }
         if ($NoModifyPath) { $env:UV_NO_MODIFY_PATH = '1' }
-        & powershell.exe -NoProfile -NonInteractive -Command 'irm https://astral.sh/uv/install.ps1 | iex'
+        $bootstrapHost = if ($PSVersionTable.PSEdition -eq 'Core') { Join-Path $PSHOME 'pwsh.exe' } else { Join-Path $PSHOME 'powershell.exe' }
+        & $bootstrapHost -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command 'irm https://astral.sh/uv/install.ps1 | iex'
         if ($LASTEXITCODE -ne 0) { throw 'The official uv installer failed.' }
     } finally {
         $env:UV_NO_MODIFY_PATH = $previousNoModify

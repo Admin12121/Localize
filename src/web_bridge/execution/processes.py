@@ -99,9 +99,10 @@ class WindowsGroup:
         entry.size = ctypes.sizeof(entry)
         resumed = False
         try:
-            # The first enumerated thread is not necessarily the suspended
-            # primary thread. ResumeThread returns its *previous* suspend
-            # count; zero is a valid call but does not resume anything.
+            # Enumeration does not identify the primary thread. A suspended
+            # helper can precede it, so visit every owned snapshot thread once.
+            # Only a previous count of one means a thread actually restarted;
+            # never loop away suspensions held by another component.
             ok = api.Thread32First(snapshot, ctypes.byref(entry))
             while ok:
                 if entry.owner == process.pid:
@@ -109,9 +110,8 @@ class WindowsGroup:
                     if thread:
                         try:
                             previous = api.ResumeThread(thread)
-                            if previous != 0xFFFFFFFF and previous > 0:
+                            if previous == 1:
                                 resumed = True
-                                break
                         finally:
                             api.CloseHandle(thread)
                 ok = api.Thread32Next(snapshot, ctypes.byref(entry))
