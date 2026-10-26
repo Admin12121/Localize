@@ -58,3 +58,13 @@ def test_more_than_thirty_finished_jobs_do_not_require_restart(tmp_path):
             result=finish(c,[sys.executable,'-c','pass'])
             assert result['exit_code']==0
     finally:c.close()
+
+
+@pytest.mark.skipif(sys.platform=='win32',reason='POSIX executable aliases')
+def test_host_launch_preserves_shell_alias(tmp_path):
+    c,root=fixture(tmp_path)
+    try:
+        result=finish(c,['/bin/sh','-c','exit 7'])
+        assert result['request']['argv'][0]=='/bin/sh'
+        assert result['state']=='failed' and result['exit_code']==7
+    finally:c.close()

@@ -81,7 +81,7 @@ ChatGPT resumes on the next prompt. This build declares `chatgpt_events: false`;
 
 ## State and release boundaries
 
-Credentials, Docker/integration configuration and task SQLite data persist in the private runtime. Grants, approvals, job history and idempotency receipts remain session state. Recovery/trash/snapshot artifacts can contain private project content and are not release inputs.
+Credentials, Docker/integration configuration and task SQLite data persist in the private runtime. Grants and approvals remain session state. Command history and idempotency receipts persist in SQLite; previous-session receipts are local inspection only. Recovery/trash/snapshot artifacts can contain private project content and are not release inputs.
 
 ```text
 scripts/package-bridge.py  → outputs/Web-Bridge.pyz

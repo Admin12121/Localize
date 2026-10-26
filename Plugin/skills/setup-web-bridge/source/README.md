@@ -1,71 +1,91 @@
 # Web-Bridge
 
-**Created and maintained by admin12121 · MIT license · Windows / macOS / Linux**
+**A private ChatGPT Site gateway and locally controlled companion for project work.**
 
-A private ChatGPT Site gateway and a locally controlled Python companion for authorized CTF websites and local coding. The existing application display name is **Admin12211's Web-Bridge instance**.
+Version **3.2.0** · Windows, macOS and Linux · Created by **admin12121** · [MIT](LICENSE)
 
-- CTF mode: explicitly approved website origins, HTTP requests, HTML inspection, cookies, browser tools, and request evidence.
-- Local coding: select a project, read/search files, review text edits, and request commands.
-- Control stays local: exact host-command approval; optional Docker execution against a filtered copy.
-- Compact command history with expandable output and live status updates.
+Inspect and change a selected project, request commands on the host or in Docker, use selected skill/MCP adapters, and save tasks with evidence for later continuation. The local owner chooses permissions, command profiles, integrations and approvals.
 
-## Quick start
+```text
+ChatGPT → your private Site / MCP gateway → authenticated HTTPS
+                                                ↓
+                                  local Python companion
+                                    ├─ selected project and saved tasks
+                                    ├─ approved web targets / MCP adapters
+                                    └─ host, snapshot or live Docker jobs
 
-### 1. Create your own private ChatGPT Site
+Separate loopback panel → project, grants, approvals, Docker setup, pause
+```
 
-Download `Web-Bridge-Setup-Plugin.zip` from this repository's release assets. In your own account, attach the ZIP to a Sites-enabled build chat and ask:
+The Site validates and forwards tool calls. It cannot grant local access. Tunnel only authenticated RPC, never the local control panel.
 
-> Install the attached Web-Bridge Setup plugin and use it to create my own private Web-Bridge Site and canonical plugin. Use fresh account-owned IDs and secrets, and keep the Site owner-only. Then show my companion download and connection steps.
+## Connect
 
-Where plugin ZIP import is offered, you can import the setup ZIP first and explicitly invoke **Web-Bridge Setup**. Installing it alone does not deploy a Site. Each recipient creates their own private Site and connection; do not use another person's endpoint or keys.
+1. Provision your own private Site using [SETUP](SETUP.md). Importing the setup plugin alone does not deploy a Site.
+2. Install Python 3.10+ and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Download the trusted `Web-Bridge.pyz`.
+3. Run `python Web-Bridge.pyz` on Windows or `python3 Web-Bridge.pyz` on macOS/Linux. Core features need no pip installation or extraction.
+4. Open the printed local panel, enter its control code, select a project, and save permissions and a command profile.
+5. Store the printed remote endpoint/key only in your private Site's connection form. Select its generated plugin in ChatGPT and call `bridge_status`.
+6. Verify a known file read and a harmless approved command in the chosen environment. Keep the companion running.
 
-Initial setup requires Sites, plugin creation, and file/build tools in the recipient's account. If these are unavailable, the package cannot enable them. Availability and workspace policy vary; universal installation on every ChatGPT account is not guaranteed. See [OpenAI Plugins](https://learn.chatgpt.com/docs/plugins) and [Sites](https://learn.chatgpt.com/docs/sites).
+The bundle starts a Quick Tunnel by default; `--local-only` disables it. From this source root, use `python bridge/launch.py --tunnel`; the source launcher tunnels only when requested.
 
-### 2. Start the companion
+## Capabilities
 
-Install Python 3.10+ and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/) once. Download `Web-Bridge.pyz` from your own Site or this repository's release assets. Open a terminal in its folder:
-
-| Windows | macOS / Linux |
+| Area | Implemented in 3.2 |
 | --- | --- |
-| `python Web-Bridge.pyz` | `python3 Web-Bridge.pyz` |
+| Workspace | Bounded list/search/read, hash-checked text edit/nested create, mkdir, move, recoverable delete/restore |
+| Commands | Shell text or exact argv; explicit local profile; launch evidence, success/failure, timeout/cancel, incremental output |
+| Docker | Filtered snapshot jobs or persistent live project; local engine/image/container setup and validated attachment |
+| Integrations | Built-in project-work skill, selected skill folders, allowlisted stdio/HTTP MCP tools |
+| Saved work | SQLite tasks, checkpoints/evidence/handoff, single-writer leases and file/command verification |
+| Continuation | ChatGPT resume on the next prompt; optional explicitly started API-backed local runner |
+| HTTP/browser | Approved-origin requests/forms/session evidence; optional scoped Chromium |
 
-No manual extraction or pip install is needed for core features. The authenticated tunnel starts by default. Keep the terminal open. Add `--local-only` to disable the public tunnel. Docker is optional, required only for isolated commands. Optional browser tools need Playwright and Chromium.
+Host commands use your OS account and always require exact per-command approval. Live Docker shares the real project and can mutate it directly. Snapshot changes need applicable text/operation permissions; unsupported or unresolved changes retain a local artifact. Reading a skill does not install tools or grant application access.
 
-### 3. Connect and choose access
+Default command timeout is 600 seconds; the local maximum can be set up to 3,600 seconds. Output is bounded to 64,000 bytes; the dashboard retains 200 compact rows and the newest 160 detailed receipts, with durable identity/idempotency receipts across restarts. Text files are bounded to 256,000 bytes; snapshots to 50 MB/5,000 entries. See [Usage](docs/usage.md) for exact limits and all 27 tools.
 
-Unlock the local panel with the terminal's **local control code**. Add authorized website URLs, or select a project and permissions. In **your private Site**, save the terminal's **Site endpoint** and **Site connection key**, then test. Keep codes and keys out of chat.
+Automatic ChatGPT event prompts are **not enabled** (`chatgpt_events: false`). Skills cannot extend platform limits. The optional local agent uses separately configured API credentials and step/time/token budgets; these are not a fixed-price guarantee. No API call is needed for core use or saving agent setup.
 
-Select your Site-generated plugin in a new ChatGPT conversation and ask it to call `bridge_status`. Confirm an approved file read or CTF request before relying on access.
+## Documentation
 
-## Public project metadata
+- [Documentation index](docs/index.md)
+- [Setup and upgrading from 3.1](SETUP.md)
+- [Usage and tool examples](docs/usage.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Architecture](ARCHITECTURE.md)
+- [Companion reference](bridge/README.md)
+- [Release scope and remaining work](docs/roadmap.md)
+- [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md)
 
-Author / creator: **admin12121**. License: [MIT](LICENSE). Software version: **3.1.1**. Setup-plugin version: **1.1.1**.
+This source package is self-contained text. Repository illustrations are intentionally excluded from the embedded setup payload.
 
-`python Web-Bridge.pyz --about` prints public project metadata without starting servers. `--version` prints the version and creator. The local panel and bridge status also show attribution.
+## Develop
 
-## Build and publish your GitHub release
-
-Requires Node 22.13+ and Python 3.10+. The Worker has no runtime npm dependencies. Run:
+Run from this source root. Requires Node.js 22.13+ and Python 3.10+; optional MCP and local-agent dependencies require Python 3.11+.
 
 ```sh
-node scripts/build.mjs
-node scripts/validate-artifact.mjs
+npm ci
+npm run check:repo
+npm run build
+npm run validate
 npm test
+python -m pip install pytest
+python -m pytest -q bridge/tests
 python scripts/package-release.py
 ```
 
-Outputs include `Web-Bridge.pyz`, companion ZIP, setup-plugin ZIP, sanitized source ZIP, release ZIP, and `SHA256SUMS`. Upload the **contents of the sanitized source ZIP** as your repository source, and attach release artifacts separately. The source ZIP has no `.git` history, Site project ID, keys, connection settings, or local runtime state. Keep the generated build and runtime folders out of Git.
+```text
+bridge/          Python companion, local controls, jobs, integrations and tasks
+worker/          Private Site interface and MCP gateway
+db/, drizzle/    Encrypted connection schema and migrations
+setup-plugin/    Private-Site provisioning workflow
+scripts/         Build, packaging, validation and sanitized source export
+tests/           Worker tests; Python tests live in bridge/tests/
+docs/            User guides and dated design/implementation records
+```
 
-For Python verification, install pytest in your development environment and run `python -m pytest -q bridge/tests`. Optional real Docker tests use `WEB_BRIDGE_DOCKER_TEST=1` with an already prepared `node:24-alpine` image. Schema development dependencies are needed only for schema changes; preserve migrations.
+Generated artifacts go to `dist/` and `outputs/`; rebuild rather than editing distribution copies. `python scripts/export-repository.py` exports sanitized source and refuses an existing destination. Updating local packages does not publish an installed Site/plugin.
 
-Fresh Site deployments generate a fresh `CONFIG_ENCRYPTION_KEY` (32 random bytes, base64), retain the D1 database binding and MCP capability, and use the supported Sites workflow. Existing deployments preserve identity, database, secret, and audience. Read [SETUP.md](SETUP.md) and [companion details](bridge/README.md).
-
-## Limits and related work
-
-Permissions and command history last for one companion run. History retains 30 jobs, output is capped at 64 KB, and commands at 120 seconds. Host execution can access outside the selected project; selecting a folder alone does not confine commands. Desktop-control and interactive-terminal APIs are not included.
-
-Similar projects already exist. See [RELATED-PROJECTS.md](RELATED-PROJECTS.md); this project makes no first-of-its-kind claim.
-
-## Contributing and reporting
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Distributed under the MIT license; retain its copyright and permission notice when redistributing. External prerequisites retain their own licenses.
+Keep credentials, runtime directories, tunnel logs and selected project data out of Git/releases. Work only on authorized projects and targets. This project has not been independently security audited.

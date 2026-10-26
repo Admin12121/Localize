@@ -70,30 +70,49 @@ class Jobs:
         return sha(os.path.normcase(str(workspace.root)).encode())
 
     def unresolved(self,workspace):
-        """Bounded evidence for prior work that could still mutate this project."""
+        """Memory remains authoritative for cleanup failures when disk is unavailable."""
         scope=self.workspace_scope(workspace)
-        with self.lock,self.database() as db:
-            rows=db.execute("SELECT summary FROM receipts WHERE recovery_required=1 AND (workspace_scope=? OR workspace_scope='') ORDER BY submitted LIMIT 100",(scope,)).fetchall()
+        with self.lock:
+            live=[self.summary(job) for job in self.items.values() if job.get('recovery_required') and job.get('workspace_scope') in ('',scope)]
+            if not live:
+                with self.database() as db:
+                    live=[json.loads(row[0]) for row in db.execute("SELECT summary FROM receipts WHERE recovery_required=1 AND (workspace_scope=? OR workspace_scope='') ORDER BY submitted LIMIT 100",(scope,)).fetchall()]
             return [{'job_id':item['job_id'],'execution':item.get('execution'),'recovery_note':item.get('recovery_note','Review this interrupted execution locally.'),
-                     'workspace_scope':item.get('workspace_scope',''),'recovery_required':True} for item in (json.loads(row[0]) for row in rows)]
+                     'workspace_scope':item.get('workspace_scope',''),'recovery_required':True} for item in live[:100]]
 
     def acknowledge_recovery(self,key,workspace,allow_unbound=False):
         """Owner confirmation only: never infer process death or signal a saved PID."""
         if type(allow_unbound) is not bool:raise WorkspaceError('Legacy recovery acknowledgement must be explicitly true or false.')
         scope=self.workspace_scope(workspace)
-        with self.lock,self.database() as db:
-            row=db.execute('SELECT result,workspace_scope FROM receipts WHERE job_id=?',(key,)).fetchone()
-            if not row:raise WorkspaceError('Unknown command receipt in this local companion.')
-            result=json.loads(row[0]);recorded=result.get('workspace_scope') or row[1] or ''
-            if (recorded and recorded!=scope) or (not recorded and not allow_unbound):
-                raise WorkspaceError('This recovery receipt is not bound to the selected project. Review its original project locally; unbound legacy receipts require explicit local migration confirmation.')
-            if key in self.items or result.get('session_id')==self.session_id or result.get('state')!='interrupted' or not result.get('outcome_unknown'):
-                raise WorkspaceError('Only interrupted historical commands can be acknowledged for recovery.')
-            if not result.get('recovery_acknowledged'):
-                result['recovery_acknowledged']={'confirmed_at':time.time(),'confirmation':'stopped/reviewed','legacy_unbound':not bool(recorded)}
-            result['recovery_required']=False
-            db.execute('UPDATE receipts SET result=?,recovery_required=0,summary=? WHERE job_id=?',(json.dumps(result),json.dumps(self.summary(result)),key))
+        with self.lock:
+            live=self.items.get(key)
+            with self.database() as db:
+                row=db.execute('SELECT result,workspace_scope FROM receipts WHERE job_id=?',(key,)).fetchone()
+                if not row:raise WorkspaceError('Unknown command receipt in this local companion.')
+                result=self.result(live) if live else json.loads(row[0]);recorded=result.get('workspace_scope') or row[1] or ''
+                if (recorded and recorded!=scope) or (not recorded and not allow_unbound):
+                    raise WorkspaceError('This recovery receipt is not bound to the selected project. Review its original project locally; unbound legacy receipts require explicit local migration confirmation.')
+                current_recovery=live and live['settled'].is_set() and live.get('recovery_required')
+                if (live and not current_recovery) or (not live and result.get('session_id')==self.session_id) or result.get('state')!='interrupted' or not result.get('outcome_unknown'):
+                    raise WorkspaceError('Only interrupted commands with settled local cleanup can be acknowledged for recovery.')
+                if not result.get('recovery_acknowledged'):
+                    result['recovery_acknowledged']={'confirmed_at':time.time(),'confirmation':'stopped/reviewed','legacy_unbound':not bool(recorded)}
+                result['recovery_required']=False
+                db.execute('UPDATE receipts SET result=?,recovery_required=0,summary=? WHERE job_id=?',(json.dumps(result),json.dumps(self.summary(result)),key))
+            if live:
+                live.update(recovery_required=False,recovery_acknowledged=result['recovery_acknowledged'])
+                project=live.get('docker_project')
+                if project:project.finish(key)
+                if getattr(self,'on_finish',None):self.on_finish(key)
             return result
+
+    def cleanup_unknown(self,job):
+        """Retain the execution identity and writer authority until owner review."""
+        with self.lock:
+            previous=job.get('previous_state',job['state'])
+            job.update(state='interrupted',previous_state=previous,success=False,outcome_unknown=True,recovery_required=True,finished_at=time.time(),
+                recovery_note='Owned command cleanup could not be confirmed. It may still be running. Inspect its execution identity and stop the original command locally, then confirm it is stopped and reviewed before further changes.')
+            job.pop('terminal_state',None)
 
     def summary(self,result):
         request=result['request']
@@ -125,7 +144,9 @@ class Jobs:
 
     def result(self,job):
         result=copy.deepcopy({k:job[k] for k in ('job_id','state','request','output','truncated','changes','snapshot','submitted_at','started_at','finished_at','execution','success','session_id','workspace_scope')})
-        result['recovery_required']=False
+        result['recovery_required']=bool(job.get('recovery_required'))
+        for name in ('outcome_unknown','previous_state','recovery_note','recovery_acknowledged','receipt_error'):
+            if name in job:result[name]=copy.deepcopy(job[name])
         result['cleanup_pending']=not job['settled'].is_set() and job['state'] in ('cancelled','timed_out')
         if 'exit_code' in job:result['exit_code']=job['exit_code']
         return result
@@ -140,8 +161,8 @@ class Jobs:
         confirmed=job['settled'].is_set() if settled is None else settled
         if confirmed:result['cleanup_pending']=False
         with self.database() as db:
-            db.execute('INSERT INTO receipts(job_id,key_hash,fingerprint,result,settled,submitted,workspace_scope,recovery_required,summary) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(job_id) DO UPDATE SET result=excluded.result,settled=excluded.settled,summary=excluded.summary',
-                (job['job_id'],job['key_hash'],job['fingerprint'],json.dumps(result),int(confirmed),job['submitted_at'],job['workspace_scope'],0,json.dumps(self.summary(result))))
+            db.execute('INSERT INTO receipts(job_id,key_hash,fingerprint,result,settled,submitted,workspace_scope,recovery_required,summary) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(job_id) DO UPDATE SET result=excluded.result,settled=excluded.settled,recovery_required=excluded.recovery_required,summary=excluded.summary',
+                (job['job_id'],job['key_hash'],job['fingerprint'],json.dumps(result),int(confirmed),job['submitted_at'],job['workspace_scope'],int(result['recovery_required']),json.dumps(self.summary(result))))
             self.compact(db)
 
     def compact(self,db):
@@ -202,14 +223,16 @@ class Jobs:
             if sum(item['state'] in ('pending','approved','running') for item in self.items.values())>=30: raise WorkspaceError('Thirty commands are active; wait for completion or cancel one.')
             if len(self.items)>=200:
                 for old_key,old_job in list(self.items.items()):
-                    if old_job['settled'].is_set():
+                    if old_job['settled'].is_set() and not old_job.get('recovery_required'):
                         del self.items[old_key]
                         if len(self.items)<160:break
             if environment=='host':
                 executable=shutil.which(argv[0],path=minimal_environment().get('PATH')) if not os.path.isabs(argv[0]) else argv[0]
                 if not executable or not Path(executable).is_file(): raise WorkspaceError('Executable is not available on this computer.')
                 if Path(executable).suffix.lower() in ('.bat','.cmd'): raise WorkspaceError('Batch files require an explicitly approved cmd.exe invocation.')
-                request['argv'][0]=str(Path(executable).resolve())
+                if Path(executable).resolve().suffix.lower() in ('.bat','.cmd'): raise WorkspaceError('Batch files require an explicitly approved cmd.exe invocation.')
+                # Preserve argv[0] aliases: BusyBox selects its shell by this name.
+                request['argv'][0]=os.path.abspath(executable)
             elif environment=='container':
                 request['image_id']=self.container_ready(image);request['docker_context']=self.docker_context
             else:
@@ -280,16 +303,20 @@ class Jobs:
             self.status(key)
             if key not in self.items:return self.status(key)
             job=self.items[key]
-            if job['state'] not in ('pending','approved','running'): return self.status(key)
-            previous_state=job['state'];job['state']=reason;job['success']=False;job['finished_at']=time.time(); process=job['process'];container=job['container']
-            receipt_error=None
+            if job['state'] not in ('pending','approved','running'):return self.status(key)
+            previous_state=job['state'];job.update(state=reason,success=False,finished_at=time.time())
+            process=job['process'];container=job['container'];failure=None
             try:self.persist(job,settled=previous_state=='pending')
-            except WorkspaceError as exc:receipt_error=exc
+            except WorkspaceError as exc:failure=exc
             if previous_state=='pending':job['settled'].set()
-        if job['request']['environment']=='docker' and self.project:self.project.cancel(key)
+        project=job.get('docker_project') or (self.project if job['request']['environment']=='docker' else None)
+        if project:
+            try:project.cancel(key);job['docker_cancelled']=True
+            except Exception as exc:self.cleanup_unknown(job);failure=exc
         if container and self.docker:
-            try: subprocess.run([self.docker,'--context',job['request'].get('docker_context','default'),'rm','-f',container],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=8,**({'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}))
-            except (OSError,subprocess.TimeoutExpired): pass
+            try:subprocess.run([self.docker,'--context',job['request'].get('docker_context','default'),'rm','-f',container],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=8,**({'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}))
+            except (OSError,subprocess.TimeoutExpired):self.cleanup_unknown(job)
+        # A failed engine cancellation must never skip local CLI termination.
         if process:
             try:
                 if os.name=='nt' and job['group']:job['group'].kill()
@@ -298,7 +325,7 @@ class Jobs:
             except OSError:
                 if process.poll() is None:process.kill()
         with self.lock:self.persist(job)
-        if receipt_error:raise receipt_error
+        if failure:raise failure
         return self.status(key)
 
     def revoke(self):
@@ -310,7 +337,7 @@ class Jobs:
 
     def run(self,key):
         job=self.items[key]; request=job['request'];workspace=job['workspace'];stage=self.runtime/('job-'+key)
-        timer=None
+        timer=None;execution_complete=False
         try:
             snapshot=None
             with self.lock:
@@ -327,6 +354,7 @@ class Jobs:
                 argv=[self.docker,'--context',request['docker_context'],*container_arguments('web-bridge-'+key,stage,request['image_id'],request['argv'],request['network'],request['cwd'])]
                 cwd=self.runtime
             elif request['environment']=='docker':
+                job['docker_project']=self.project
                 self.project.validate_workspace(workspace)
                 argv=self.project.build_command(key,request['argv'],request['cwd']);cwd=self.runtime
             else:
@@ -346,7 +374,9 @@ class Jobs:
                 try:
                     self.persist(job)
                     job['group']=WindowsGroup(process) if os.name=='nt' else None
-                except Exception:process.kill();process.wait();raise
+                except Exception:
+                    if request['environment']!='docker':process.kill();process.wait()
+                    raise
             timer=threading.Timer(request['timeout'],lambda:self.cancel(key,'timed_out'));timer.daemon=True;timer.start()
             captured=bytearray()
             while True:
@@ -357,7 +387,7 @@ class Jobs:
                     if room>0:captured.extend(block[:room]);job['output']=captured.decode('utf-8',errors='replace')
                     if len(block)>room:job['truncated']=True
                     if room>0 or not job.get('output_saved'):self.persist(job);job['output_saved']=True
-            process.wait()
+            process.wait();execution_complete=True
             with self.lock:
                 job['exit_code']=process.returncode
                 if job['state'] in ('cancelled','timed_out') or not self.valid(request['generation']): return
@@ -405,15 +435,26 @@ class Jobs:
                         job['output']='Command launch/execution failed: '+type(exc).__name__+' (OS error '+str(getattr(exc,'winerror',None) or getattr(exc,'errno',None))+'). Check executable, working directory and local permissions.'
                     else:job['output']='Command failed ('+type(exc).__name__+'). Check local prerequisites and logs.'
         finally:
-            if timer:timer.cancel()
-            if job['group']:job['group'].close()
-            elif os.name!='nt' and job['process']:kill_posix_group(job['process'].pid)
-            if request['environment']=='docker' and self.project:self.project.finish(key)
-            if getattr(self,'on_finish',None):
-                try:self.on_finish(key)
-                except ValueError:pass
-            if stage.exists() and not job.get('artifact_retained'):shutil.rmtree(stage,ignore_errors=True)
-            with self.lock:
-                if job['state'] not in ('cancelled','timed_out') and job.get('terminal_state'):job['state']=job.pop('terminal_state')
-                try:self.persist(job,settled=True)
-                finally:job['settled'].set()
+            try:
+                if timer:timer.cancel()
+                project=job.get('docker_project')
+                if project and not execution_complete and not job.get('docker_cancelled'):
+                    try:project.cancel(key);job['docker_cancelled']=True
+                    except Exception:self.cleanup_unknown(job)
+                if job['group']:job['group'].close()
+                elif job['process']:
+                    if os.name!='nt':kill_posix_group(job['process'].pid)
+                    elif job['process'].poll() is None:job['process'].kill();job['process'].wait()
+                if project and not job.get('recovery_required'):project.finish(key)
+                if not job.get('recovery_required') and getattr(self,'on_finish',None):
+                    try:self.on_finish(key)
+                    except ValueError:pass
+                if stage.exists() and not job.get('artifact_retained'):shutil.rmtree(stage,ignore_errors=True)
+            except Exception:
+                self.cleanup_unknown(job)
+            finally:
+                with self.lock:
+                    if job['state'] not in ('cancelled','timed_out','interrupted') and job.get('terminal_state'):job['state']=job.pop('terminal_state')
+                    try:self.persist(job,settled=True)
+                    except WorkspaceError:job['receipt_error']='Final execution receipt could not be saved. Review this command locally before retrying.'
+                    finally:job['settled'].set()

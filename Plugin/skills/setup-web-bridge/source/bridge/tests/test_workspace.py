@@ -108,3 +108,81 @@ def test_concurrent_save_during_edit_commit_is_preserved(tmp_path,monkeypatch,ex
     monkeypatch.setattr(workspace.os,'fsync',race)
     with pytest.raises(WorkspaceError):ws.apply(edit['edit_id'])
     assert path.read_bytes()==b'competing editor change'
+
+
+@pytest.mark.skipif(os.name!='nt',reason='Windows pinned-source overwrite commit')
+def test_editor_save_after_final_hash_check_is_preserved(tmp_path,monkeypatch):
+    path=tmp_path/'main.txt';path.write_bytes(b'original')
+    ws=Workspace(tmp_path);edit=ws.propose('main.txt','bridge change',digest('original'))
+    read_at=ws._read_at;reads=0
+    def race(*args):
+        nonlocal reads
+        data=read_at(*args);reads+=1
+        if reads==2:path.write_bytes(b'competing editor change')
+        return data
+    monkeypatch.setattr(ws,'_read_at',race)
+    with pytest.raises(WorkspaceError,match='changed|edited'):ws.apply(edit['edit_id'])
+    assert path.read_bytes()==b'competing editor change'
+
+
+@pytest.mark.skipif(os.name!='nt',reason='Windows pinned-source overwrite commit')
+def test_editor_recreation_during_publish_preserves_recoverable_original(tmp_path,monkeypatch):
+    import workspace
+    path=tmp_path/'main.txt';path.write_bytes(b'original')
+    ws=Workspace(tmp_path);edit=ws.propose('main.txt','bridge change',digest('original'))
+    link=workspace.os.link
+    def race(source,destination,**kwargs):
+        path.write_bytes(b'competing editor change')
+        return link(source,destination,**kwargs)
+    monkeypatch.setattr(workspace.os,'link',race)
+    with pytest.raises(WorkspaceError,match='[Rr]ecover') as failure:ws.apply(edit['edit_id'])
+    assert path.read_bytes()==b'competing editor change'
+    backups=list(tmp_path.glob('.web-bridge-backup-*'))
+    assert len(backups)==1 and backups[0].read_bytes()==b'original'
+    assert backups[0].name in str(failure.value)
+    assert [entry['path'] for entry in ws.listing()['entries']]==['main.txt']
+    with pytest.raises(WorkspaceError):ws.read(backups[0].name)
+
+
+@pytest.mark.skipif(os.name!='nt',reason='Windows pinned-source overwrite commit')
+def test_successful_overwrite_preserves_mode_and_removes_recovery_files(tmp_path):
+    import stat
+    path=tmp_path/'main.txt';path.write_bytes(b'original');mode=stat.S_IMODE(path.stat().st_mode)
+    ws=Workspace(tmp_path);edit=ws.propose('main.txt','bridge change',digest('original'))
+    assert ws.apply(edit['edit_id'])['applied']
+    assert path.read_bytes()==b'bridge change'
+    assert stat.S_IMODE(path.stat().st_mode)==mode
+    assert list(tmp_path.iterdir())==[path]
+
+
+@pytest.mark.skipif(not sys.platform.startswith('linux'),reason='Linux original-inode recovery guarantee')
+def test_posix_open_writer_keeps_recoverable_original_after_publish(tmp_path,monkeypatch):
+    import workspace
+    path=tmp_path/'main.txt';path.write_bytes(b'original')
+    ws=Workspace(tmp_path);edit=ws.propose('main.txt','bridge change',digest('original'))
+    link=workspace.os.link
+    with path.open('r+b') as editor:
+        def race(*args,**kwargs):
+            result=link(*args,**kwargs)
+            editor.seek(0);editor.write(b'late editor contents');editor.truncate();editor.flush()
+            return result
+        monkeypatch.setattr(workspace.os,'link',race)
+        result=ws.apply(edit['edit_id'])
+    assert path.read_bytes()==b'bridge change'
+    assert (tmp_path/result['recovery_path']).read_bytes()==b'late editor contents'
+    assert [entry['path'] for entry in ws.listing()['entries']]==['main.txt']
+
+
+@pytest.mark.skipif(not sys.platform.startswith('linux'),reason='Linux moved-source hash verification')
+def test_posix_changed_displaced_file_is_restored_without_publishing(tmp_path,monkeypatch):
+    from file_operations import FileOperations
+    path=tmp_path/'main.txt';path.write_bytes(b'original')
+    ws=Workspace(tmp_path);edit=ws.propose('main.txt','bridge change',digest('original'))
+    rename=FileOperations._native_rename
+    def race(self,source,destination,*args,**kwargs):
+        if source=='main.txt':path.write_bytes(b'competing editor change')
+        return rename(self,source,destination,*args,**kwargs)
+    monkeypatch.setattr(FileOperations,'_native_rename',race)
+    with pytest.raises(WorkspaceError,match='changed'):ws.apply(edit['edit_id'])
+    assert path.read_bytes()==b'competing editor change'
+    assert not list(tmp_path.glob('.web-bridge-backup-*'))

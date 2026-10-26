@@ -48,7 +48,7 @@ Snapshot Docker uses a filtered copy of the project, not a real-project mount; i
 
 Live Docker uses a persistent container mapped to the selected real project. Save/check local setup, explicitly prepare an image and create or validate attachment. Context/endpoint and mapping are pinned, socket exposure is rejected, and broader attached configurations require local inspection/acknowledgment where applicable. Commands write shared files directly. Stop/remove only affects bridge-owned containers; per-exec cancellation targets command groups rather than unrelated container work.
 
-Submit once with an idempotency key and poll the job ID. `pending`/`approved` are not execution success. Nonzero exit is `failed` with `success: false`; timeout and cancellation differ. Inspect launch evidence, output, exit code, `success`, `cleanup_pending` and the intended effect. Output is bounded to 64,000 bytes with incremental character offsets. Up to 30 jobs may be active; detailed history rolls at 200 with archived session receipts. Jobs/receipts do not survive restart.
+Submit once with an idempotency key and poll the job ID. `pending`/`approved` are not execution success. Nonzero exit is `failed` with `success: false`; timeout and cancellation differ. Inspect launch evidence, output, exit code, `success`, `cleanup_pending` and the intended effect. Output is bounded to 64,000 bytes with incremental character offsets. Up to 30 jobs may be active. The dashboard retains 200 compact rows and the newest 160 detailed durable receipts, with older identity/idempotency tombstones. Restart preserves inspection-only receipts; potentially unfinished executions require local stopped/reviewed confirmation before new writes.
 
 ## Files, tasks and private runtime
 
@@ -62,7 +62,7 @@ For the single-file bundle, runtime data lives separately from temporary extract
 - macOS: `~/Library/Application Support/Web-Bridge/runtime`
 - Linux: `$XDG_STATE_HOME/web-bridge` or `~/.local/state/web-bridge`
 
-Use `--runtime .runtime` only when intentionally reusing an older source installation's runtime; stop its old process first. Connection keys, task SQLite state and selected integration/Docker configuration persist. Grants and in-memory command history reset. Quick Tunnel URLs may change; update the private Site endpoint without unnecessarily changing its saved key. Runtime state can contain credentials/private source and must never be uploaded.
+Use `--runtime .runtime` only when intentionally reusing an older source installation's runtime; stop its old process first. Connection keys, task SQLite state and selected integration/Docker configuration persist. Grants and active execution state reset; durable command receipts remain available for local inspection. Quick Tunnel URLs may change; update the private Site endpoint without unnecessarily changing its saved key. Runtime state can contain credentials/private source and must never be uploaded.
 
 Saved tasks preserve checks, evidence and handoff, not automatic mutation replay. ChatGPT resumes on the next prompt; after a new session choose **Use in ChatGPT** locally. Automatic ChatGPT event prompts are not enabled. A local writer lease coordinates bridge mutations; it does not control unrelated editors.
 

@@ -102,7 +102,7 @@ For incremental output, pass the previous `next_output_offset`. Offsets count ch
 
 A nonzero process exit reports `success: false`; the 3.1 misleading-completed behavior is fixed. For timeout/cancellation, keep polling while `cleanup_pending` is true. A public terminal outcome can precede process-group cleanup; do not start competing mutations before cleanup settles.
 
-Use `command_cancel` with the job ID to cancel. Reuse an idempotency key only for an identical retry under the same policy. Changed commands/policy need a new key. Archived session receipts prevent old identical submissions from executing twice; their output may be omitted and marked `history_archived`. Restart does not preserve command jobs/receipts. If a response is lost, inspect the existing job/effect before any resubmission.
+Use `command_cancel` with the job ID to cancel. Reuse an idempotency key only for an identical retry under the same policy. Changed commands/policy need a new key. Durable receipts prevent identical submissions from executing twice; older output may be omitted and marked `history_archived`. Restart preserves receipts for local inspection and never resumes or reapproves them automatically. Keys cannot be reused across a changed companion session; inspect the old outcome before preparing any new request. If a response is lost, inspect the existing job/effect before any resubmission.
 
 A zero exit does not prove that a GUI appeared, a server is healthy, or the whole assignment is complete. Verify the requested result separately.
 

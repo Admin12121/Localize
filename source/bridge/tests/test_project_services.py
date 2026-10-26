@@ -79,7 +79,7 @@ def test_agent_workspace_lease_blocks_chat_mutation(tmp_path):
 
 @pytest.mark.skipif(os.name!='nt',reason='Windows shell adapters')
 @pytest.mark.parametrize('shell,command,filename',[
-    ('powershell',"Set-Content -LiteralPath 'proof space Ω.txt' -Value 'done'",'proof space Ω.txt'),
+    ('powershell',"Set-Content -LiteralPath 'proof space Î©.txt' -Value 'done'",'proof space Î©.txt'),
     ('cmd','echo done>proof-cmd.txt','proof-cmd.txt'),
 ])
 def test_shell_commands_create_files_with_real_windows_adapters(tmp_path,shell,command,filename):
@@ -155,6 +155,7 @@ def test_cmd_preserves_quoted_command_text(tmp_path,absolute):
         assert (root/'proof cmd.txt').read_text()=='done'
     finally:c.close()
 
+@pytest.mark.skipif(os.name!='nt',reason='Fixture models Windows process-group cleanup; POSIX groups have separate runtime coverage')
 def test_borrowed_agent_lease_survives_cancel_until_job_cleanup(tmp_path,monkeypatch):
     import threading
     from agent_runner import AgentRunner

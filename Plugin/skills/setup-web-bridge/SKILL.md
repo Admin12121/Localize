@@ -11,7 +11,7 @@ This is an explicit setup workflow. Installing this plugin does not start a prog
 
 Confirm native Sites tools and filesystem/build execution are available. If either is missing, explain that initial deployment needs a Sites-enabled, build-capable environment; do not promise regular Chat can run setup without those capabilities. Sites access depends on the recipient's account/plan/workspace. Normal Chat use is the goal after deployment and user connection, not evidence established by installing this skill.
 
-The complete portable source is in `source/` next to this skill, including `README.md` and `SETUP.md`. Read those before deployment. Load the available Sites skill and its Site MCP server reference, then use its supported source-sync, packaging, and private publication workflow. Do not run source-sync against a developer's or previous recipient's Site.
+The complete portable source is in `source/` next to this skill, including `README.md`. Read it before deployment. Load the available Sites skill and its Site MCP server reference, then use its supported source-sync, packaging, and private publication workflow. Do not run source-sync against a developer's or previous recipient's Site.
 
 ## Fresh deployment
 

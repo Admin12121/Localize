@@ -44,7 +44,7 @@ The bundle starts a Quick Tunnel by default; `--local-only` disables it. From th
 
 Host commands use your OS account and always require exact per-command approval. Live Docker shares the real project and can mutate it directly. Snapshot changes need applicable text/operation permissions; unsupported or unresolved changes retain a local artifact. Reading a skill does not install tools or grant application access.
 
-Default command timeout is 600 seconds; the local maximum can be set up to 3,600 seconds. Output is bounded to 64,000 bytes; detailed history rolls at 200 jobs with session idempotency receipts. Text files are bounded to 256,000 bytes; snapshots to 50 MB/5,000 entries. See [Usage](docs/usage.md) for exact limits and all 27 tools.
+Default command timeout is 600 seconds; the local maximum can be set up to 3,600 seconds. Output is bounded to 64,000 bytes; the dashboard retains 200 compact rows and the newest 160 detailed receipts, with durable identity/idempotency receipts across restarts. Text files are bounded to 256,000 bytes; snapshots to 50 MB/5,000 entries. See [Usage](docs/usage.md) for exact limits and all 27 tools.
 
 Automatic ChatGPT event prompts are **not enabled** (`chatgpt_events: false`). Skills cannot extend platform limits. The optional local agent uses separately configured API credentials and step/time/token budgets; these are not a fixed-price guarantee. No API call is needed for core use or saving agent setup.
 

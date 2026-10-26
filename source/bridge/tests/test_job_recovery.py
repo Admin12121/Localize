@@ -303,3 +303,108 @@ def test_dashboard_reads_only_compact_receipts_and_preserves_human_shell_label(t
     assert 'output' not in rows[0]
     assert 'request' not in rows[0]
     assert len(json.dumps(rows))<1000
+
+class LocalExecutionProject:
+    """Model a Docker CLI and its independent workload with two real processes."""
+    def __init__(self,root,fail_cancel=False):
+        self.root=root;self.fail_cancel=fail_cancel;self._jobs={};self.worker=None
+    def validate_workspace(self,workspace):workspace.check_root()
+    def build_command(self,key,argv,cwd):
+        code='import time;from pathlib import Path;time.sleep(.75);Path('+repr(str(self.root/'orphan-mutated'))+').write_text("mutated");time.sleep(60)'
+        options={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}
+        self.worker=subprocess.Popen([sys.executable,'-c',code],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,**options)
+        self._jobs[key]={'container_id':'fixture-container','context':'fixture-context','token':'private-cancellation-token','worker':self.worker}
+        return [sys.executable,'-c','import time;print("independent-workload-started",flush=True);time.sleep(60)']
+    def cancel(self,key):
+        if self.fail_cancel:raise WorkspaceError('Fixture engine unavailable; cancellation unconfirmed.')
+        if key not in self._jobs:return False
+        self.worker.kill();self.worker.wait(timeout=5);self._jobs.pop(key)
+        return True
+    def finish(self,key):return self._jobs.pop(key,None) is not None
+    def cleanup(self):
+        if self.worker and self.worker.poll() is None:self.worker.kill();self.worker.wait(timeout=5)
+
+@pytest.mark.parametrize('after_output',[False,True])
+def test_storage_failure_cancels_owned_workload_before_releasing_lease(tmp_path,after_output):
+    import sqlite3
+    jobs,ws=ready(tmp_path);project=LocalExecutionProject(ws.root);jobs.project=project
+    holders=set();released_while_live=[]
+    jobs.on_approve=lambda key:holders.add(key)
+    def release(key):
+        released_while_live.append(project.worker.poll() is None);holders.discard(key)
+    jobs.on_finish=release
+    queued=jobs.request(['fixture-command'],'',10,'docker','docker-write-failure',ws,1,False,'unused')
+    with sqlite3.connect(jobs.receipt_path) as db:
+        predicate=" AND json_extract(NEW.result,'$.output')<>''" if after_output else ''
+        db.execute("CREATE TRIGGER reject_running_receipt BEFORE UPDATE ON receipts WHEN json_extract(NEW.result,'$.state')='running'"+predicate+" BEGIN SELECT RAISE(FAIL,'fixture storage failure'); END")
+    try:
+        jobs.approve(queued['job_id'],True)
+        assert jobs.items[queued['job_id']]['settled'].wait(5)
+        assert project.worker.poll() is not None
+        assert queued['job_id'] not in project._jobs
+        assert not holders
+        assert released_while_live==[False]
+        time.sleep(.85)
+        assert not (ws.root/'orphan-mutated').exists()
+    finally:project.cleanup()
+
+def test_failed_docker_cleanup_retains_identity_and_memory_blocker_during_storage_failure(tmp_path):
+    import sqlite3
+    jobs,ws=ready(tmp_path);project=LocalExecutionProject(ws.root,fail_cancel=True);jobs.project=project
+    holders=set();jobs.on_approve=lambda key:holders.add(key);jobs.on_finish=lambda key:holders.discard(key)
+    queued=jobs.request(['fixture-command'],'',10,'docker','docker-cleanup-unknown',ws,1,False,'unused')
+    with sqlite3.connect(jobs.receipt_path) as db:
+        db.execute("""CREATE TRIGGER reject_execution_receipts BEFORE UPDATE ON receipts
+            WHEN (json_extract(NEW.result,'$.state')='running' AND json_extract(NEW.result,'$.output')<>'')
+              OR json_extract(NEW.result,'$.state') IN ('failed','interrupted')
+            BEGIN SELECT RAISE(FAIL,'fixture storage failure'); END""")
+    try:
+        jobs.approve(queued['job_id'],True)
+        assert jobs.items[queued['job_id']]['settled'].wait(5)
+        result=jobs.status(queued['job_id'])
+        assert result['state']=='interrupted'
+        assert result['outcome_unknown'] is True
+        assert result['recovery_required'] is True
+        assert queued['job_id'] in project._jobs
+        assert project.worker.poll() is None
+        assert holders=={queued['job_id']}
+        # Recovery blocking survives unavailable storage in the current process.
+        with sqlite3.connect(jobs.receipt_path) as db:
+            db.execute('DROP TRIGGER reject_execution_receipts')
+        original_database=jobs.database
+        from contextlib import contextmanager
+        @contextmanager
+        def unavailable():raise WorkspaceError('Fixture storage unavailable.');yield
+        jobs.database=unavailable
+        try:assert jobs.unresolved(ws)[0]['job_id']==queued['job_id']
+        finally:jobs.database=original_database
+        fresh=request(jobs,ws,key='after-failed-cleanup')
+        with pytest.raises(WorkspaceError):jobs.approve(fresh['job_id'],True)
+        project.cleanup()
+        ack=jobs.acknowledge_recovery(queued['job_id'],ws)
+        assert ack['recovery_required'] is False
+        assert not holders
+        assert queued['job_id'] not in project._jobs
+        assert jobs.unresolved(ws)==[]
+    finally:project.cleanup()
+
+def test_owner_cancel_failure_still_stops_cli_and_keeps_workload_recovery_authority(tmp_path):
+    jobs,ws=ready(tmp_path);project=LocalExecutionProject(ws.root,fail_cancel=True);jobs.project=project
+    holders=set();jobs.on_approve=lambda key:holders.add(key);jobs.on_finish=lambda key:holders.discard(key)
+    queued=jobs.request(['fixture-command'],'',10,'docker','docker-owner-cancel-fail',ws,1,False,'unused')
+    try:
+        jobs.approve(queued['job_id'],True)
+        deadline=time.monotonic()+5
+        while jobs.status(queued['job_id'])['state']!='running' and time.monotonic()<deadline:time.sleep(.01)
+        with pytest.raises(WorkspaceError):jobs.cancel(queued['job_id'])
+        live=jobs.items[queued['job_id']]
+        assert live['settled'].wait(5)
+        assert live['process'].poll() is not None
+        assert project.worker.poll() is None
+        assert queued['job_id'] in project._jobs
+        assert holders=={queued['job_id']}
+        assert jobs.status(queued['job_id'])['recovery_required'] is True
+        assert jobs.unresolved(ws)[0]['job_id']==queued['job_id']
+        restarted=Jobs(jobs.runtime,threading.RLock(),lambda generation:True)
+        assert restarted.unresolved(ws)[0]['job_id']==queued['job_id']
+    finally:project.cleanup()

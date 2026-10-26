@@ -1,17 +1,23 @@
+# Generated bundles and local build state
 dist/
+outputs/
 site.tar.gz
-bridge/.runtime/
-.env
-.dev.vars
 *.tgz
 *.zip
+*.pyz
+
+# Local credentials and machine-specific configuration
+.env
+.env.*
+.dev.vars
+bridge/.runtime/
+bridge/targets.json
+.test-runtime/
+.test-deps/
+
+# Tooling caches and dependencies
+node_modules/
 __pycache__/
 .pytest_cache/
-node_modules/
-.test-deps/
-bridge/targets.json
 .superpowers/
-.test-runtime/
-
-*.pyz
-outputs/
+.DS_Store

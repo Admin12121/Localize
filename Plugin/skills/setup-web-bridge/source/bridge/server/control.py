@@ -51,6 +51,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                 if self.headers.get('If-None-Match')==etag:return self.send(304,b'',headers={'ETag':etag})
                 return self.send(200,state,headers={'ETag':etag})
             route=urlsplit(self.path)
+            if route.path=='/api/docker/status':return self.send(200,self.server.companion.docker_status(workspace_id=self.server.companion.workspace_id))
+            if route.path=='/api/task':return self.send(200,self.server.companion.task_read(parse_qs(route.query).get('id',[''])[0],workspace_id=self.server.companion.workspace_id))
             if route.path in ('/api/job','/api/edit'):
                 key=parse_qs(route.query).get('id',[''])[0]
                 if len(key)>64:raise ValueError('Invalid operation ID.')
@@ -78,8 +80,21 @@ class ControlHandler(BaseHTTPRequestHandler):
                 targets=data.get('targets',{})
                 from bridge import Bridge
                 if type(data.get('allow_private',False)) is not bool:raise WorkspaceError('Invalid private-target permission.')
-                result=companion.configure(root=data.get('root',''),alias=data.get('alias','workspace'),targets=targets,allow_private=data.get('allow_private',False),**data.get('permissions',{}))
+                result=companion.configure(root=data.get('root',''),alias=data.get('alias','workspace'),targets=targets,allow_private=data.get('allow_private',False),profile=data.get('profile'),**data.get('permissions',{}))
                 return self.send(200,result)
+            if self.path=='/api/docker/configure':return self.send(200,companion.configure_docker(data))
+            if self.path=='/api/docker/action':
+                action=data.pop('action',None);return self.send(200,companion.docker_action(action,**data))
+            if self.path=='/api/integrations/add':return self.send(200,companion.integration_add(data.get('entry')))
+            if self.path=='/api/integrations/remove':return self.send(200,companion.integration_remove(data.get('name')))
+            if self.path=='/api/runner/configure':return self.send(200,companion.configure_runner(data))
+            if self.path=='/api/runner/start':return self.send(200,companion.start_runner(data.get('task_id')))
+            if self.path=='/api/runner/cancel':return self.send(200,companion.cancel_runner(data.get('task_id')))
+            if self.path=='/api/job/review-stopped':return self.send(200,companion.acknowledge_command_recovery(data.get('job_id')))
+            if self.path=='/api/task/complete':return self.send(200,companion.complete_task_locally(data.get('task_id')))
+            if self.path=='/api/task/resume':return self.send(200,companion.resume_task(data.get('task_id')))
+            if self.path=='/api/artifact/remove':return self.send(200,companion.discard_artifact(data.get('job_id')))
+            if self.path=='/api/task/create':return self.send(200,companion.task_create(data.get('intent'),data.get('checks'),workspace_id=companion.workspace_id))
             if self.path=='/api/choose-folder':
                 script="import tkinter as t;from tkinter import filedialog;r=t.Tk();r.withdraw();print(filedialog.askdirectory(title='Choose a project folder for Web-Bridge'));r.destroy()"
                 import os
@@ -95,5 +110,5 @@ class ControlHandler(BaseHTTPRequestHandler):
             return self.send(404,{'error':'Not found'})
         except LookupError as exc:self.send(401,{'error':str(exc)})
         except PermissionError as exc:self.send(403,{'error':str(exc)})
-        except (WorkspaceError,ValueError,TypeError):self.send(400,{'error':'Invalid settings or operation. Check the selected folder, request, and permissions.'})
+        except (WorkspaceError,ValueError,TypeError) as exc:self.send(400,{'error':str(exc)[:1000] or 'Invalid local operation.'})
         except Exception:self.send(400,{'error':'Local operation failed; check prerequisites and retry.'})

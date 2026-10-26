@@ -58,7 +58,7 @@ The companion enforces permissions. The Site cannot select a project, grant acce
 | Optional local agent | Explicitly started API-backed saved-task execution within step/time/token budgets | Separate API credentials/dependencies and billing; approvals still apply; no fixed-cost guarantee |
 | Web work | Approved-origin HTTP, forms, cookies/history and optional Chromium actions | Exact locally approved origins; no redirects; separate browser setup |
 
-Command profiles default to **10 minutes** and allow an owner-selected maximum of **1 hour**. Output is bounded to 64,000 bytes. Rolling detailed history retains up to 200 jobs, with archived idempotency receipts in the current session. Text files are limited to 256,000 bytes; snapshots to 50 MB and 5,000 entries. See [usage and limits](source/docs/usage.md).
+Command profiles default to **10 minutes** and allow an owner-selected maximum of **1 hour**. Output is bounded to 64,000 bytes. The dashboard retains up to 200 compact rows and the newest 160 detailed receipts; durable identity/idempotency receipts remain across restarts. Text files are limited to 256,000 bytes; snapshots to 50 MB and 5,000 entries. See [usage and limits](source/docs/usage.md).
 
 ## Commands: approve, poll, verify
 
