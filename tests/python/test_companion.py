@@ -157,3 +157,44 @@ def test_activity_summary_is_bounded_and_detail_is_lazy(tmp_path):
     assert c.local_state()['jobs'][0]['state']=='expired'
     assert c.bridge_status()['pending_commands']==0
     c.close()
+
+
+def test_ai_working_context_reflects_owner_grants_without_probing(tmp_path):
+    from web_bridge.app import Companion
+    root = tmp_path / 'source'
+    root.mkdir()
+    c = Companion(None, tmp_path / 'runtime')
+    try:
+        context = c.bridge_status()['working_context']
+        assert context['workspace_selected'] is False
+        assert context['command']['allowed'] is False
+        assert context['integrations']['adapters'] == []
+        assert context['desktop']['general_control'] is False
+        c.configure(root=str(root), read=True, execution=True, host=False,
+                    integrations=True, profile={'environment': 'container', 'shell': 'sh'})
+        context = c.bridge_status()['working_context']
+        assert context['can_read'] is True
+        assert context['can_edit'] is False
+        assert context['command']['mode'] == 'isolated_snapshot'
+        assert context['command']['docker_preflight_required'] is True
+        c.integration_add({'type': 'mcp', 'name': 'local_editor',
+                           'transport': 'stdio', 'command': 'mock-tool',
+                           'enabled_tools': ['read_document'], 'timeout': 10})
+        assert c.bridge_status()['working_context']['integrations']['adapters'][0]['tools'] == ['read_document']
+        c.pause(True)
+        assert c.bridge_status()['working_context']['integrations']['adapters'] == []
+        assert c.bridge_status()['working_context']['command']['allowed'] is False
+    finally:
+        c.close()
+
+
+def test_working_context_does_not_offer_integrations_after_project_is_deselected(tmp_path):
+    root=tmp_path/'project';root.mkdir();c=Companion(None,tmp_path/'runtime')
+    try:
+        c.configure(root=str(root),read=True,integrations=True)
+        c.integration_add({'type':'mcp','name':'editor','transport':'stdio','command':'fixture','enabled_tools':['read']})
+        assert 'web-bridge-project-work' in c.bridge_status()['working_context']['integrations']['skills']
+        c.configure(root='',read=False,integrations=True)
+        context=c.bridge_status()['working_context']['integrations']
+        assert context['enabled'] is False and context['adapters']==[] and context['skills']==[]
+    finally:c.close()

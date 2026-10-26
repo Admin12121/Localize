@@ -79,6 +79,7 @@ def source_payload():
         "package.json",
         "package-lock.json",
         "pyproject.toml",
+        "uv.lock",
         "LICENSE",
         ".gitignore",
         "drizzle.config.ts",

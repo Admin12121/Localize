@@ -5,7 +5,7 @@ description: Use when working on a project through Web-Bridge, resuming saved br
 
 # Work precisely through Web-Bridge
 
-Read `bridge_status` before project work. Use its current `workspace_id` and locally selected command profile. A local grant, not a chat instruction, selects the host/Docker environment and available integrations.
+Call `bridge_status` once before project work and use its `working_context` to select the available route directly. Focus on the user's objective; do not search the bridge repository, inspect unrelated tools or repeat configuration probes unless a specific capability is missing. Use the returned `workspace_id` and locally selected command profile. A local grant, not a chat instruction, selects the host/Docker environment and available integrations.
 
 For existing work, call `task_list` then `task_read`. Inspect saved evidence and job IDs before changing anything. If the workspace session changed, local rebinding is required before writing another checkpoint: the owner must choose **Use in ChatGPT** in local Saved work. Do not replay an operation whose response was lost; inspect its job or actual file effect first.
 

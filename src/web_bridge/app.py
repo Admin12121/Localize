@@ -253,7 +253,100 @@ class Companion(
                     "chatgpt_events": False,
                 },
                 "local_controls": "Open the companion control panel on this computer to change permissions or approve operations.",
+                # A compact, read-only capability map lets the AI choose a
+                # working route from the first status call. Only locally
+                # granted adapters appear; no credentials, roots, or commands.
+                "working_context": self.working_context(),
             }
+
+    def working_context(self):
+        """Describe usable routes without probing, connecting, or granting access.
+
+        'configured' is never presented as 'ready'; Docker engine readiness
+        must be verified with docker_status, and desktop interaction requires
+        an explicitly selected application MCP adapter.
+        """
+        integrations = self.integrations.status()
+        permissions = self.policy
+        selected = self.profile["environment"]
+        integrations_allowed = bool(
+            self.workspace and permissions["integrations"] and not self.paused
+        )
+        adapters = (
+            [
+                {
+                    "name": server["name"],
+                    "transport": server["transport"],
+                    "tools": list(server["enabled_tools"]),
+                    "enabled": server["enabled"],
+                }
+                for server in integrations["servers"]
+                if server["enabled"]
+            ]
+            if integrations_allowed
+            else []
+        )
+        skills = (
+            [item["name"] for item in integrations["skills"]]
+            if (integrations_allowed)
+            else []
+        )
+        if integrations_allowed:
+            skills = list(dict.fromkeys(["web-bridge-project-work", *skills]))
+        command_allowed = bool(
+            self.workspace
+            and not self.paused
+            and permissions["execution"]
+            and (selected != "host" or permissions["host"])
+        )
+        mode = (
+            "host_approval"
+            if selected == "host"
+            else "docker_project" if selected == "docker" else "isolated_snapshot"
+        )
+        return {
+            "workspace_selected": bool(self.workspace),
+            "can_read": bool(
+                self.workspace and permissions["read"] and not self.paused
+            ),
+            "can_edit": bool(
+                self.workspace and permissions["write"] and not self.paused
+            ),
+            "command": {
+                "allowed": command_allowed,
+                "mode": mode,
+                "shell": self.profile["shell"],
+                "requires_owner_approval": (
+                    selected == "host" or not permissions["auto_container"]
+                ),
+                "docker_preflight_required": selected != "host",
+            },
+            "integrations": {
+                "enabled": integrations_allowed,
+                "sdk_installed": integrations["mcp_available"],
+                "adapters": adapters,
+                "skills": skills,
+            },
+            "desktop": {
+                "general_control": False,
+                "application_mcp_only": True,
+            },
+            "next_steps": [
+                item
+                for needed, item in (
+                    (not self.workspace, "Select a project in local controls."),
+                    (
+                        selected != "host" and command_allowed,
+                        "Use docker_status before a Docker command, if readiness is unknown.",
+                    ),
+                    (
+                        bool(adapters),
+                        "Use mcp_tools for an adapter's validated schemas before mcp_call.",
+                    ),
+                )
+                if needed
+            ],
+        }
 
     def local_state(self):
         with self.lock:

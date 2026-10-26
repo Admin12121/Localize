@@ -4,7 +4,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import hashlib
 import shutil
-from release_inputs import OUT, portable_readme
+from release_inputs import ROOT, OUT, portable_readme
 
 out = OUT
 required = [
@@ -26,6 +26,15 @@ assets = {
     "LICENSE": Path("LICENSE").read_bytes(),
     "README.md": portable_readme(),
 }
+# Include the installable CLI wheel when built; standalone bundle remains available.
+import json
+
+version = json.loads(
+    (ROOT / "src/web_bridge/metadata.json").read_text(encoding="utf-8")
+)["version"]
+wheel = out / f"localizeit-{version}-py3-none-any.whl"
+if wheel.is_file():
+    assets[wheel.name] = wheel.read_bytes()
 checksums = "".join(
     hashlib.sha256(data).hexdigest() + "  " + name + "\n"
     for name, data in sorted(assets.items())

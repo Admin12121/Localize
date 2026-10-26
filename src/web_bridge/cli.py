@@ -40,7 +40,12 @@ def find_cloudflared():
                         Path(base) / "Microsoft/WinGet/Links/cloudflared.exe",
                     ]
                 )
-    return next((str(p) for p in candidates if p.is_file()), None)
+    found = next((str(p) for p in candidates if p.is_file()), None)
+    if found:
+        return found
+    from web_bridge.setup.tunnel import cached_cloudflared
+
+    return cached_cloudflared()
 
 
 def private_file(path, create):
@@ -130,7 +135,7 @@ def secure_runtime(path):
             kernel.CloseHandle(token)
 
 
-def main():
+def parse_options(argv=None):
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -156,16 +161,26 @@ def main():
         "--target",
         help="One explicitly approved CTF origin; more can be configured locally",
     )
-    parser.add_argument(
+    network = parser.add_mutually_exclusive_group()
+    network.add_argument(
         "--tunnel",
         action="store_true",
         help="Expose authenticated RPC with an installed cloudflared Quick Tunnel",
+    )
+    network.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Keep the companion on this computer without a tunnel",
     )
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--runtime", type=Path, default=runtime_home())
     parser.add_argument("--rpc-port", type=int, default=8765)
     parser.add_argument("--control-port", type=int, default=8766)
-    options = parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def main(argv=None, *, tunnel_binary=None):
+    options = parse_options(argv)
     if options.about:
         import json
 
@@ -213,7 +228,7 @@ def main():
         if not options.no_browser:
             webbrowser.open(local)
         if options.tunnel:
-            cloudflared = find_cloudflared()
+            cloudflared = tunnel_binary or find_cloudflared()
             if not cloudflared:
                 raise ValueError(
                     "Install cloudflared first. Windows: winget install Cloudflare.cloudflared; macOS: brew install cloudflared; Linux: use the official Cloudflare package."

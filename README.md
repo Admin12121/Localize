@@ -1,4 +1,4 @@
-# Web-Bridge
+# Localize (Web-Bridge)
 
 **Connect ChatGPT to your project, with permissions controlled on your computer.**
 
@@ -7,6 +7,35 @@ Version **3.2.0** · Setup plugin **1.2.0** · Created by [admin12121](https://g
 Read and update files, run approved host or Docker commands, connect selected skills/MCP applications, and save work for later continuation. A private Site forwards authenticated calls to the local Python companion. The local control panel selects the project and grants access.
 
 ![System architecture](images/01-system-architecture.png)
+
+## One-command Localize launcher
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) once. It manages Python and an isolated app environment; users do not need to clone the project, build the Site, or manage a virtual environment to run an already published companion.
+
+**Available now from this checkout:**
+
+```sh
+# Build and run directly without installing the project globally
+uvx --from . localizeit
+
+# Or build/install all command aliases once, then run localize
+uv tool install .
+localize
+```
+
+**From a downloaded wheel:**
+
+```sh
+uvx --from ./localizeit-3.2.0-py3-none-any.whl localizeit
+```
+
+The launcher opens the local panel and starts the authenticated tunnel. It reuses an installed cloudflared, or downloads the official release into a private user cache and checks its published SHA-256 before use. Subsequent launches reuse the verified cache. No administrator install is needed. Automatic tunnel preparation supports Windows x64, macOS Intel/Apple Silicon, and Linux x64/arm64; other architectures can use an existing supported cloudflared installation. Add `--local-only` for offline local controls without a tunnel/download. `--about` and `--help` never prepare dependencies.
+
+The installed commands are `localize`, `localizeit`, and the compatible `web-bridge`. The existing `web-bridge` command keeps its explicit `--tunnel` behavior. Runtime state and permissions remain compatible with Web-Bridge 3.2.
+
+**After the owner publishes the package to PyPI**, the short command will be `uvx localizeit`, or `uv tool install localizeit` followed by `localize`. Publication has not been performed by the local build. Optional adapters use `localizeit[integrations]`; the independent runner uses `localizeit[agent]`, both with Python 3.11+. For example, after publication: `uvx --python 3.12 --from "localizeit[integrations]" localizeit`.
+
+Docker is required only when you choose Docker execution and must be installed/running separately. The CLI cannot silently create or publish a ChatGPT Site: use the one-time setup workflow below, then install/select the generated plugin in normal ChatGPT.
 
 ## Start
 
@@ -34,7 +63,7 @@ Core features need no pip installation or extraction. Keep the companion running
 
 ## Operating-system setup
 
-The same Python companion runs on all three desktop platforms. **Python 3.10+** is sufficient for core features; **Python 3.11+** is required for the optional MCP adapters and agent. Docker commands require a separately running **Linux-container** engine. Do not run the companion as root or as a Windows service for desktop-related behavior.
+The same Python companion runs on all three desktop platforms. The manual Python/cloudflared steps below apply to downloaded `.pyz` releases; the uv-based Localize launcher manages those dependencies as described above. **Python 3.10+** is sufficient for core features; **Python 3.11+** is required for the optional MCP adapters and agent. Docker commands require a separately running **Linux-container** engine. Do not run the companion as root or as a Windows service for desktop-related behavior.
 
 | Platform | Prepare Python and tunnel | Docker |
 | --- | --- | --- |
@@ -63,8 +92,8 @@ You can check the core installation without starting network listeners using `py
 
 On **each person's computer**:
 
-1. Install Python and cloudflared once. Download the trusted `Web-Bridge.pyz` from your private Site or release package.
-2. Run `python Web-Bridge.pyz` (Windows) or `python3 Web-Bridge.pyz` (macOS/Linux).
+1. Install uv once and download the trusted `localizeit-3.2.0-py3-none-any.whl` from the release package.
+2. Run `uvx --from ./localizeit-3.2.0-py3-none-any.whl localizeit` on Windows, macOS or Linux. The standalone alternative is `Web-Bridge.pyz` with Python/cloudflared installed as described above.
 3. Unlock the printed local panel, select the project and permissions, and choose the command environment. Docker is optional unless you choose Docker execution.
 4. In the authorized Site connection page, save **your own** printed remote endpoint and connection key. Keep the companion running.
 5. In a new ChatGPT chat, select the installed bridge with `@` and send:
@@ -77,7 +106,7 @@ On **each person's computer**:
 
 **Sharing an existing deployment:** use the plugin's sharing settings for the intended people/workspace, and ensure its Site is also accessible to them. Send the supported plugin link plus the companion download and the sample prompt above. Each recipient installs the plugin and connects their own companion; sharing a plugin does not install local software or grant access to your PC. Sharing requires the applicable workspace permission. [OpenAI's sharing guide](https://learn.chatgpt.com/docs/build-plugins#share-the-plugin-with-your-team)
 
-**Sharing independent copies:** send `web-bridge-setup-plugin.zip` and `Web-Bridge.pyz`. Each recipient uses the setup workflow to provision their own account-owned private Site/plugin once, then follows the steps above. Initial provisioning requires Sites/build capabilities; ordinary chat can use the connected plugin afterward. Share release assets, not your runtime folder, credentials or connection key.
+**Sharing independent copies:** send `web-bridge-setup-plugin.zip` and the Localize wheel (or `Web-Bridge.pyz`). Each recipient uses the setup workflow to provision their own account-owned private Site/plugin once, then follows the steps above. Initial provisioning requires Sites/build capabilities; ordinary chat can use the connected plugin afterward. Share release assets, not your runtime folder, credentials or connection key.
 
 Build assets are in `dist/release/` after `npm run build`; `python scripts/package-release.py` also produces the combined release ZIP. Local packaging does not publish a Site or create a public one-click installation link.
 
@@ -188,7 +217,7 @@ Python code lives in `src/web_bridge/`, grouped by feature. The application asse
 ```text
 src/web_bridge/  app.py, cli.py, resources.py
                 workspace/ execution/ integrations/ tasks/
-                web/ transport/ security/ ui/ skills/
+                web/ transport/ security/ setup/ ui/ skills/
 gateway/        Site runtime, interface, database and migrations
 Plugin/         Setup-plugin metadata and functional skill
 scripts/        Source entry, build and release operations
@@ -207,6 +236,7 @@ npm run validate
 npm test
 python -m pip install pytest
 python -m pytest -q tests/python
+uv build --wheel --out-dir dist/release
 python scripts/package-release.py
 ```
 

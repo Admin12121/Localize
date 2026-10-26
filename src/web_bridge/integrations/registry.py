@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import secrets
 import threading
+import time
 from urllib.parse import urlsplit
 
 from web_bridge.workspace.files import Workspace, WorkspaceError
@@ -64,6 +65,7 @@ class Integrations:
         self.entries = []
         self.roots = {}
         self.closed = False
+        self._tool_cache = {}
         if self.path.exists():
             try:
                 if self.path.stat().st_size > MAX_CONFIG:
@@ -218,6 +220,7 @@ class Integrations:
             finally:
                 temporary.unlink(missing_ok=True)
             self.entries, self.roots = selected, roots
+            self._tool_cache.clear()
             return self.status()
 
     def _open(self):
@@ -289,7 +292,7 @@ class Integrations:
             tools = []
             for item in entries:
                 if item["enabled_tools"]:
-                    tools.extend(self._request(item, "tools"))
+                    tools.extend(self._redact(item, self._discovered(item)))
             return self._bounded({"tools": tools})
 
     def call(self, server, tool, arguments):
@@ -302,6 +305,16 @@ class Integrations:
                 raise IntegrationError("MCP arguments must be an object.")
             self._bounded(arguments)
             return self._request(item, "call", tool, copy.deepcopy(arguments))
+
+    def _discovered(self, item):
+        """Cache advertised schemas, not privileged connections or tool results."""
+        key = item["name"]
+        cached = self._tool_cache.get(key)
+        if cached and time.monotonic() - cached[0] < 30:
+            return copy.deepcopy(cached[1])
+        tools = self._request(item, "tools")
+        self._tool_cache[key] = (time.monotonic(), copy.deepcopy(tools))
+        return tools
 
     def _bounded(self, result):
         try:
@@ -374,27 +387,43 @@ class Integrations:
                     async with Client(
                         transport, read_timeout_seconds=item["timeout"], cache=None
                     ) as client:
-                        selected = []
-                        cursor = None
-                        for _ in range(10):
-                            listing = await client.list_tools(cursor=cursor)
-                            for discovered in listing.tools:
-                                if discovered.name in item["enabled_tools"]:
-                                    selected.append(
-                                        {
-                                            "server": item["name"],
-                                            "name": discovered.name,
-                                            "description": discovered.description or "",
-                                            "inputSchema": discovered.input_schema,
-                                        }
-                                    )
-                            cursor = listing.next_cursor
-                            if not cursor:
-                                break
-                        else:
-                            raise IntegrationError(
-                                "MCP discovery exceeds the pagination limit."
-                            )
+                        cached = (
+                            self._tool_cache.get(item["name"])
+                            if operation == "call"
+                            else None
+                        )
+                        cache_hit = (
+                            cached is not None and time.monotonic() - cached[0] < 30
+                        )
+                        selected = copy.deepcopy(cached[1]) if cache_hit else []
+                        if not cache_hit:
+                            cursor = None
+                            for _ in range(10):
+                                listing = await client.list_tools(cursor=cursor)
+                                for discovered in listing.tools:
+                                    if discovered.name in item["enabled_tools"]:
+                                        selected.append(
+                                            {
+                                                "server": item["name"],
+                                                "name": discovered.name,
+                                                "description": discovered.description
+                                                or "",
+                                                "inputSchema": discovered.input_schema,
+                                            }
+                                        )
+                                cursor = listing.next_cursor
+                                if not cursor:
+                                    break
+                            else:
+                                raise IntegrationError(
+                                    "MCP discovery exceeds the pagination limit."
+                                )
+                            self._bounded(selected)
+                            if operation == "call":
+                                self._tool_cache[item["name"]] = (
+                                    time.monotonic(),
+                                    copy.deepcopy(selected),
+                                )
                         self._bounded(selected)
                         if operation == "tools":
                             return selected
@@ -430,7 +459,12 @@ class Integrations:
                         }
 
         try:
-            return self._bounded(self._redact(item, asyncio.run(run())))
+            result = asyncio.run(run())
+            # Keep internal schemas intact for validation; every public discovery
+            # and call result is redacted at its own boundary.
+            return self._bounded(
+                self._redact(item, result) if operation == "call" else result
+            )
         except IntegrationError:
             raise
         except TimeoutError:
@@ -460,3 +494,4 @@ class Integrations:
     def close(self):
         with self.lock:
             self.closed = True
+            self._tool_cache.clear()

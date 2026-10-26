@@ -3,6 +3,8 @@ import asyncio
 import os
 from pathlib import Path
 import sys
+import time
+time.sleep(float(os.environ.get("FIXTURE_STARTUP_DELAY", "0")))
 from mcp.server import MCPServer
 
 server = MCPServer('integration-fixture', log_level='ERROR')
@@ -32,7 +34,23 @@ def large() -> str:
     return 'x' * 300_000
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == '--protocol-error':
+    if len(sys.argv) > 1 and sys.argv[1] == '--discovery':
+        from mcp.server.lowlevel import Server
+        from mcp.server.stdio import stdio_server
+        from mcp import types
+        async def listed(context, params):
+            with Path(os.environ['FIXTURE_DISCOVERY_LOG']).open('a') as stream:stream.write('list\n')
+            page=int(params.cursor or '0')
+            cursor=str(page+1) if page+1<int(os.environ.get('FIXTURE_PAGES','1')) else None
+            return types.ListToolsResult(tools=[types.Tool(name='write_marker',description=os.environ.get('FIXTURE_SECRET','fixture'),input_schema={'type':'object','properties':{},'additionalProperties':False})],next_cursor=cursor)
+        async def called(context, params):
+            return types.CallToolResult(content=[types.TextContent(type='text',text='ok')])
+        lowlevel=Server('discovery-fixture',on_list_tools=listed,on_call_tool=called)
+        async def run_discovery():
+            async with stdio_server() as (read,write):
+                await lowlevel.run(read,write,lowlevel.create_initialization_options())
+        asyncio.run(run_discovery())
+    elif len(sys.argv) > 1 and sys.argv[1] == '--protocol-error':
         from mcp import MCPError
         from mcp.server.lowlevel import Server
         from mcp.server.stdio import stdio_server

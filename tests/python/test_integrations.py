@@ -106,33 +106,28 @@ def test_real_stdio_discovery_call_and_bounded_redacted_results(tmp_path):
     with pytest.raises(IntegrationError): registry.tools('fixture')
 
 
-def test_real_stdio_timeout_does_not_replay_side_effect(tmp_path):
+@pytest.mark.parametrize('startup_delay',[0,4])
+def test_real_stdio_timeout_does_not_replay_side_effect(tmp_path,monkeypatch,startup_delay):
     pytest.importorskip('mcp')
-    registry = Integrations(tmp_path / 'runtime'); registry.configure([entry(timeout=2)])
-    marker = tmp_path / 'late.txt'; started = time.monotonic()
-    with pytest.raises(IntegrationError, match='timed out'):
-        registry.call('fixture', 'slow', {'path': str(marker)})
-    assert time.monotonic() - started < 8
-    time.sleep(.2)
+    import mcp.client.stdio as stdio
+    processes=[]
+    spawn=stdio._create_platform_compatible_process
+    async def observed_spawn(*args,**kwargs):
+        process=await spawn(*args,**kwargs)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(stdio,'_create_platform_compatible_process',observed_spawn)
+    registry=Integrations(tmp_path/'runtime')
+    registry.configure([entry(timeout=2,env={'FIXTURE_STARTUP_DELAY':str(startup_delay)})])
+    marker=tmp_path/'late.txt';started=time.monotonic()
+    with pytest.raises(IntegrationError,match='timed out'):
+        registry.call('fixture','slow',{'path':str(marker)})
+    assert time.monotonic()-started<12
     assert not marker.exists()
-    pid = int(marker.with_suffix('.pid').read_text())
-    if os.name == 'nt':
-        import ctypes
-        from ctypes import wintypes
-        api = ctypes.WinDLL('kernel32', use_last_error=True)
-        api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-        api.OpenProcess.restype = wintypes.HANDLE
-        api.CloseHandle.argtypes = [wintypes.HANDLE]
-        api.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
-        handle = api.OpenProcess(0x1000, False, pid)
-        if handle:
-            try:
-                code = wintypes.DWORD()
-                assert api.GetExitCodeProcess(handle, ctypes.byref(code))
-                assert code.value != 259, 'timed-out MCP subprocess is still running'
-            finally: api.CloseHandle(handle)
-    else:
-        with pytest.raises(ProcessLookupError): os.kill(pid, 0)
+    # Timeout can precede tool dispatch. Observe the actual owned process,
+    # rather than assuming the tool had time to write its PID file.
+    assert len(processes)==1,'A timed-out request must never spawn a retry.'
+    assert processes[0].returncode is not None,'Timed-out MCP subprocess survived cleanup.'
 
 
 def test_credentials_are_redacted_even_when_short(tmp_path):
@@ -214,3 +209,51 @@ def test_real_http_discovery_and_call(tmp_path):
         assert 'local-only-secret' not in json.dumps(registry.status())
     finally:
         process.terminate(); process.wait(timeout=10)
+
+
+def test_discovery_cache_is_bounded_and_invalidated_when_configuration_changes(tmp_path, monkeypatch):
+    registry = Integrations(tmp_path / 'runtime')
+    registry.configure([entry()])
+    calls = []
+    def fake_request(item, operation, tool=None, arguments=None):
+        calls.append((item['name'], operation))
+        return [{'server': item['name'], 'name': 'write_marker',
+                 'inputSchema': {'type': 'object'}}]
+    monkeypatch.setattr(registry, '_request', fake_request)
+    first = registry.tools('fixture')
+    first['tools'][0]['name'] = 'tampered'
+    assert registry.tools('fixture')['tools'][0]['name'] == 'write_marker'
+    assert len(calls) == 1
+    registry.configure([entry(enabled_tools=['write_marker'])])
+    assert registry.tools('fixture')['tools'][0]['name'] == 'write_marker'
+    assert len(calls) == 2
+
+
+def discovery_entry(tmp_path,**environment):
+    return entry(args=[str(FIXTURE),'--discovery'],enabled_tools=['write_marker'],env={'FIXTURE_DISCOVERY_LOG':str(tmp_path/'discoveries'),**environment})
+
+def test_call_then_cached_discovery_never_exposes_adapter_secrets(tmp_path):
+    pytest.importorskip('mcp')
+    registry=Integrations(tmp_path/'runtime')
+    registry.configure([discovery_entry(tmp_path,FIXTURE_SECRET='private-adapter-secret')])
+    registry.call('fixture','write_marker',{})
+    assert 'private-adapter-secret' not in json.dumps(registry.tools('fixture'))
+
+def test_discovery_cache_expiry_is_not_extended_by_calls(tmp_path,monkeypatch):
+    pytest.importorskip('mcp')
+    from types import SimpleNamespace
+    import web_bridge.integrations.registry as module
+    clock=[0.0];monkeypatch.setattr(module,'time',SimpleNamespace(monotonic=lambda:clock[0]))
+    registry=Integrations(tmp_path/'runtime');registry.configure([discovery_entry(tmp_path)])
+    registry.tools('fixture');clock[0]=20
+    registry.call('fixture','write_marker',{})
+    after_call=len((tmp_path/'discoveries').read_text().splitlines());clock[0]=31
+    registry.tools('fixture')
+    assert len((tmp_path/'discoveries').read_text().splitlines())>after_call
+
+def test_partial_discovery_after_ten_pages_is_rejected(tmp_path):
+    pytest.importorskip('mcp')
+    registry=Integrations(tmp_path/'runtime')
+    registry.configure([discovery_entry(tmp_path,FIXTURE_PAGES='11')])
+    with pytest.raises(IntegrationError,match='pagination'):
+        registry.tools('fixture')
