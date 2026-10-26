@@ -6,7 +6,7 @@ import threading
 
 
 class WindowsGroup:
-    def __init__(self, process):
+    def __init__(self, process_handle, primary_thread_handle):
         import ctypes
         from ctypes import wintypes as w
 
@@ -70,22 +70,19 @@ class WindowsGroup:
             or not api.SetInformationJobObject(
                 self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)
             )
-            or not api.AssignProcessToJobObject(self.handle, int(process._handle))
+            or not api.AssignProcessToJobObject(self.handle, int(process_handle))
         ):
             self.close()
             raise OSError("Unable to establish owned Windows process group.")
 
-        # Resume the Job Object's process: thread enumeration can leave its primary thread suspended.
-        native = ctypes.WinDLL("ntdll")
-        resume_process = native.NtResumeProcess
-        resume_process.argtypes = [w.HANDLE]
-        resume_process.restype = ctypes.c_long  # NTSTATUS
-        status = resume_process(int(process._handle))
-        if status != 0:
+        api.ResumeThread.argtypes = [w.HANDLE]
+        api.ResumeThread.restype = w.DWORD
+        previous = api.ResumeThread(int(primary_thread_handle))
+        if previous != 1:
             self.close()
             raise OSError(
-                "Unable to resume owned Windows command "
-                f"(NTSTATUS 0x{status & 0xFFFFFFFF:08x})."
+                "Unable to resume the command's primary Windows thread "
+                f"(previous suspend count: {previous})."
             )
 
     def kill(self):
@@ -98,6 +95,69 @@ class WindowsGroup:
             if self.handle:
                 self.api.CloseHandle(self.handle)
                 self.handle = None
+
+
+class WindowsCreateProcessProxy:
+    def __init__(self, winapi):
+        self.winapi = winapi
+        self.group = None
+
+    def __getattr__(self, key):
+        return getattr(self.winapi, key)
+
+    def CreateProcess(self, *args, **kwargs):
+        params = list(args)
+        if len(params) < 6:
+            raise OSError("Unsupported Windows subprocess creation arguments.")
+        params[5] = int(params[5]) | 0x4
+        process_handle, thread_handle, pid, tid = self.winapi.CreateProcess(
+            *params, **kwargs
+        )
+        try:
+            self.group = WindowsGroup(process_handle, thread_handle)
+        except BaseException:
+            try:
+                self.winapi.TerminateProcess(process_handle, 1)
+            except OSError:
+                pass
+            finally:
+                self.winapi.CloseHandle(thread_handle)
+                self.winapi.CloseHandle(process_handle)
+            raise
+        return process_handle, thread_handle, pid, tid
+
+
+def spawn_owned_windows(argv, **kwargs):
+    import subprocess
+    import types
+
+    original = subprocess.Popen._execute_child
+    if not isinstance(original, types.FunctionType):
+        raise OSError("Windows process creation is unsupported by this Python runtime.")
+    winapi = original.__globals__.get("_winapi")
+    if not winapi or "CreateProcess" not in original.__code__.co_names:
+        raise OSError("Windows process creation cannot be safely intercepted.")
+    proxy = WindowsCreateProcessProxy(winapi)
+    globals_copy = dict(original.__globals__)
+    globals_copy["_winapi"] = proxy
+    execute = types.FunctionType(
+        original.__code__, globals_copy, original.__name__,
+        original.__defaults__, original.__closure__,
+    )
+    execute.__kwdefaults__ = original.__kwdefaults__
+
+    class OwnedPopen(subprocess.Popen):
+        _execute_child = execute
+
+    try:
+        process = OwnedPopen(argv, **kwargs)
+        if proxy.group is None:
+            raise OSError("Windows command was not assigned to an owned process group.")
+        return process, proxy.group
+    except BaseException:
+        if proxy.group is not None:
+            proxy.group.close()
+        raise
 
 
 def kill_posix_group(pid):

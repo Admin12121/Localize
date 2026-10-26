@@ -14,7 +14,7 @@ import subprocess
 import threading
 import time
 from web_bridge.workspace.files import WorkspaceError, Workspace, sha
-from web_bridge.execution.processes import WindowsGroup, kill_posix_group
+from web_bridge.execution.processes import spawn_owned_windows, kill_posix_group
 
 
 def container_arguments(name, stage, image, argv, network=False, cwd=""):
@@ -934,23 +934,22 @@ class Jobs:
                         + request["command"]
                         + chr(34)
                     )
-                process = subprocess.Popen(
-                    argv,
+                options = dict(
                     cwd=cwd,
                     env=minimal_environment(),
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    **(
-                        {
-                            "creationflags": subprocess.CREATE_NO_WINDOW
-                            | subprocess.CREATE_NEW_PROCESS_GROUP
-                            | 0x4
-                        }
-                        if os.name == "nt"
-                        else {"start_new_session": True}
-                    ),
                 )
+                if os.name == "nt":
+                    process, job["group"] = spawn_owned_windows(
+                        argv,
+                        creationflags=subprocess.CREATE_NO_WINDOW
+                        | subprocess.CREATE_NEW_PROCESS_GROUP,
+                        **options,
+                    )
+                else:
+                    process = subprocess.Popen(argv, start_new_session=True, **options)
                 job["process"] = process
                 job["state"] = "running"
                 job["started_at"] = time.time()
@@ -981,7 +980,6 @@ class Jobs:
                     }
                 try:
                     self.persist(job)
-                    job["group"] = WindowsGroup(process) if os.name == "nt" else None
                 except Exception:
                     if request["environment"] != "docker":
                         process.kill()
