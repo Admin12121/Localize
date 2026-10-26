@@ -1,4 +1,4 @@
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,cpSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 const python=process.platform==='win32'?'python':'python3';
 execFileSync(process.execPath,['scripts/check-repo.mjs'],{stdio:'inherit'});
@@ -9,5 +9,6 @@ const tools=JSON.parse(readFileSync('src/web_bridge/BRIDGE_TOOLS.json','utf8')).
 const page=readFileSync('gateway/interface.html','utf8').replace('__STYLE__',readFileSync('src/web_bridge/ui/ui.css','utf8'));
 const source=readFileSync('gateway/runtime.js','utf8').replace('"__TOOLS__"',JSON.stringify(tools)).replace('"__PAGE__"',JSON.stringify(page)).replace('"__BRIDGE_ZIP__"',JSON.stringify(readFileSync('dist/release/web-bridge-companion.zip').toString('base64'))).replace('"__BUNDLE__"',JSON.stringify(readFileSync('dist/release/Web-Bridge.pyz').toString('base64'))).replace('"__SETUP_ZIP__"',JSON.stringify(readFileSync('dist/release/web-bridge-setup-plugin.zip').toString('base64')));
 mkdirSync('dist/server',{recursive:true});mkdirSync('dist/.openai',{recursive:true});
+cpSync('gateway/drizzle','dist/.openai/drizzle',{recursive:true});
 writeFileSync('dist/server/index.js',source);writeFileSync('dist/.openai/hosting.json',readFileSync('.openai/hosting.json'));
 console.log('Built stateless MCP Worker and private connection interface.');
