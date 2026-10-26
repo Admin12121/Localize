@@ -168,7 +168,7 @@ def test_authenticated_http_mcp(app):
         assert tok['token_type']=='Bearer'
         headers['Authorization']='Bearer '+tok['access_token']
         tools=json.load(urlopen(Request(base+'/mcp',data=req,headers=headers)))['result']['tools']
-        assert len(tools)==16 and all(t['securitySchemes'][0]['type']=='oauth2' for t in tools)
+        assert len(tools)==27 and all(t['securitySchemes'][0]['type']=='oauth2' for t in tools)
         assert json.load(urlopen(base+'/.well-known/oauth-protected-resource/mcp'))['resource'] == meta['resource']
         headers['Origin']='https://evil.example'
         with pytest.raises(HTTPError) as exc:

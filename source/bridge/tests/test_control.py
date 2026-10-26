@@ -77,7 +77,7 @@ def test_single_file_launcher_help_and_local_only_start(tmp_path):
             line=process.stdout.readline();lines.append(line)
             if 'Local-only launch' in line or not line:break
         assert process.poll() is None
-        assert any('3.1.1' in line for line in lines)
+        assert any('3.2.0' in line for line in lines)
         assert (runtime/'site-connection-key').is_file()
     finally:process.terminate();process.communicate(timeout=8)
 
@@ -89,6 +89,6 @@ def test_bundle_about_metadata_does_not_start_a_companion(tmp_path):
     assert result.returncode==0
     metadata=json.loads(result.stdout)
     assert metadata['author']==metadata['creator']=='admin12121'
-    assert metadata['license']=='MIT' and metadata['version']=='3.1.1'
+    assert metadata['license']=='MIT' and metadata['version']=='3.2.0'
     assert not runtime.exists()
     assert Companion(None,tmp_path/'runtime').bridge_status()['creator']=='admin12121'

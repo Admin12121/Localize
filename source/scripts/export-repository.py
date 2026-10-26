@@ -27,7 +27,7 @@ jobs:
       - run: npm run build
       - run: npm run validate
       - run: npm test
-      - run: python -m pip install pytest
+      - run: python -m pip install pytest -r bridge/requirements-integrations.txt -r bridge/requirements-agent.txt
       - run: python -m pytest -q bridge/tests
       - run: python scripts/package-release.py
 """

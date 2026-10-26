@@ -29,13 +29,13 @@ test('current Sites MCP discovery and tool listing work without bridge settings'
   assert.deepEqual(discovery.capabilities,{tools:{}});
   const list=await worker.fetch(request('/mcp','POST',{jsonrpc:'2.0',id:4,method:'tools/list'},current),{});
   assert.equal(list.status,200);
-  assert.equal((await list.json()).result.tools.length,16);
+  assert.equal((await list.json()).result.tools.length,27);
   assert.equal((await call({},'list_targets',{},current)).result.isError,true);
 });
 test('MCP discovery exposes all original tools and evidence history without data',async()=>{
   const res=await worker.fetch(request('/mcp','POST',{jsonrpc:'2.0',id:1,method:'tools/list'}),{});
   const names=(await res.json()).result.tools.map(t=>t.name);
-  assert.equal(names.length,16);for(const name of ['list_targets','http_request','http_batch','inspect_html','session_cookies','reset_session','browser_action','request_history','bridge_status','workspace_list','workspace_read','workspace_search','workspace_edit','command_request','command_status','command_cancel'])assert(names.includes(name));
+  assert.equal(names.length,27);for(const name of ['list_targets','http_request','http_batch','inspect_html','session_cookies','reset_session','browser_action','request_history','bridge_status','workspace_list','workspace_read','workspace_search','workspace_edit','command_request','command_status','command_cancel'])assert(names.includes(name));
   const init=await worker.fetch(request('/mcp','POST',{jsonrpc:'2.0',id:2,method:'initialize',params:{protocolVersion:'2025-06-18'}}),{});assert.equal((await init.json()).result.protocolVersion,'2025-06-18');
   const notification=await worker.fetch(request('/mcp','POST',{jsonrpc:'2.0',method:'notifications/initialized'}),{});assert.equal(notification.status,202);
 });
@@ -75,7 +75,7 @@ test('Site tools delegate to real authenticated Python bridge and real HTTP GET/
   globalThis.fetch=(url,options)=>realFetch(url==='https://fixture.trycloudflare.com/mcp'?`http://127.0.0.1:${fixture.bridge_port}/mcp`:url,options);
   try{
     await save(env,'https://fixture.trycloudflare.com/mcp',token);
-    const status=(await call(env,'bridge_status')).result;assert.equal(status.isError,false);assert.equal(JSON.parse(status.content[0].text).version,'3.1.1');assert.equal(JSON.parse(status.content[0].text).creator,'admin12121');assert.equal(JSON.parse(status.content[0].text).license,'MIT');
+    const status=(await call(env,'bridge_status')).result;assert.equal(status.isError,false);assert.equal(JSON.parse(status.content[0].text).version,'3.2.0');assert.equal(JSON.parse(status.content[0].text).creator,'admin12121');assert.equal(JSON.parse(status.content[0].text).license,'MIT');
     assert.equal((await call(env,'workspace_list')).result.isError,true);
     let result=(await call(env,'list_targets')).result;assert.equal(result.isError,false,JSON.stringify(result));assert.equal(JSON.parse(result.content[0].text).targets[0].origin,`http://127.0.0.1:${fixture.challenge_port}`);
     result=(await call(env,'http_request',{target:'lab'})).result;assert.equal(JSON.parse(result.content[0].text).status,200);

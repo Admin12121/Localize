@@ -1,56 +1,56 @@
 # Illustrated Web-Bridge workflows
 
-[Project README](../README.md) · [Implemented architecture](../source/ARCHITECTURE.md) · [Actual tool examples](../source/docs/usage.md)
+[Project README](../README.md) · [Architecture](../source/ARCHITECTURE.md) · [Actual tool examples](../source/docs/usage.md)
 
-These eight owner-supplied illustrations are preserved without image edits and renamed by subject. They explain the intended workflow, but their embedded names, examples, and capability labels are not an API specification. The notes below identify where they differ from version 3.1.1.
+These eight owner-supplied illustrations are preserved without image edits and named by subject. Their embedded API names, labels and examples are conceptual, not the 3.2 contract. Captions below describe the actual implementation and remaining limits.
 
 ## 1. System architecture
 
 ![Private Site, companion and controlled local resources](images/01-system-architecture.png)
 
-The request path is accurate at a high level. Docker image building is not implemented. “Safe shell commands” does not describe a security boundary: approved host commands run with the owner's OS-account access. The private Site runs on the existing Sites infrastructure; a separate self-hosted worker is not required by this project.
+The high-level request path is accurate. The Site forwards authenticated calls; local controls grant access. Docker now supports filtered snapshots and locally configured live project containers with explicit image preparation/attachment. Automatic image building is not provided. “Safe shell commands” is not a host security boundary: approved host jobs use the owner's OS account beyond the project. The private Site runs on Sites infrastructure.
 
 ## 2. Host command lifecycle
 
 ![Host command approval, execution and polling](images/02-host-command-lifecycle.png)
 
-Use `command_request` with an argument array, not `run_command` or a `cmd` string. The maximum timeout is 120 seconds, not the pictured 600. Host mode is not isolated. Output combines stdout and stderr. A `completed` state can currently accompany a nonzero exit code; confirm the exit code and observed effect. Local approval is not execution evidence.
+Use `command_request` and `command_status`, not `run_command`. Use `command` plus a configured shell, or exact `argv`, never both. Host commands always need exact local approval and are not isolated. Default timeout is 600 seconds; the owner-selected maximum is at most 3,600. Output combines stdout/stderr and is bounded. Nonzero exit is now `failed` with `success: false`; timeout and cancellation differ. Approval is not execution evidence; inspect results, cleanup and actual effects.
 
 ## 3. Isolated Docker job
 
-![Filtered Docker snapshot and separate file-change approval](images/03-docker-snapshot-job.png)
+![Filtered Docker snapshot and separate change approval](images/03-docker-snapshot-job.png)
 
-Use `command_request` with `environment: "container"`; there is no `docker.run` tool. The selected image must be one of the three supported pre-pulled images. The container root filesystem is read-only, but its filtered `/workspace` copy is writable so the job can propose text changes. The original project is not mounted. Current timeout is at most 120 seconds, not 300. Deletions and new nested folders do not sync back today.
+Snapshot mode is `container` in the local command profile; there is no `docker.run` tool. Choose a supported pre-pulled image locally. The container root is read-only, while the filtered `/workspace` copy is writable; the original project is not mounted. Eligible nested creates/edits and deletions become proposals under separate text/operation permissions. Unsupported, excluded, conflicting or excess changes are reported and retain an artifact for local inspection. Snapshot limits remain 50 MB/5,000 entries; this is distinct from live Docker sharing.
 
 ## 4. Workspace edit lifecycle
 
-![Hash-checked text edit proposal, local review and application](images/04-workspace-edit-lifecycle.png)
+![Hash-checked text proposal, local review and application](images/04-workspace-edit-lifecycle.png)
 
-Use `workspace_edit`, `text`, and `expected_sha256`. An existing file's hash is required to match; it is not optional for an overwrite. Omit the hash only when creating an absent file in an existing directory. Paths are relative without the pictured leading `/`. The operation is path-scoped; it is not a process isolation environment.
+Use `workspace_edit`, `text` and the current `expected_sha256` for an existing file. Omit the hash only for an absent new file; approved creation can make missing parents. Paths are relative without a leading `/`. `workspace_operation` separately proposes mkdir, move, recoverable delete and restore. Recursive deletion needs its own grant. Proposals are not applied effects; inspect results/readback. Preserve a reported local recovery path until inspected. File scope is not process isolation.
 
 ## 5. Approved HTTP request
 
 ![Origin validation, bounded HTTP request and evidence](images/05-approved-http-request.png)
 
-The actual tool is `http_request`. `target` is the name configured locally, not necessarily its hostname. HTTP and HTTPS origins are supported; private/local lab targets need separate local opt-in. Requests do not follow redirects. Evidence and cookies are bounded session state, not an unlimited permanent archive.
+The actual tool is `http_request`; `target` is the configured local target name. HTTP/HTTPS exact origins are supported, with separate local permission for private labs. Redirects are not followed. Cookies/evidence are bounded session data, not an unlimited permanent archive. These origin controls do not constrain host-command or selected adapter networking.
 
 ## 6. Build, deploy and connect
 
 ![Source builds, private Site setup and companion connection](images/06-build-deploy-connect.png)
 
-Use `source/`, `npm run build`, and the documented packaging scripts; `scripts/build.sh`, a root `web-bridge.py`, and the pictured directory structure are illustrative. The worker is the Site gateway, not an autonomous long-running agent. The remote Site uses the printed authenticated HTTPS endpoint; do not enter a localhost example as its remote endpoint. Keys shown in this artwork are illustrative; never put real connection keys in a screenshot. Follow [SETUP](../source/SETUP.md).
+Use canonical `source/`, `npm run build` and documented package scripts; the pictured layout and build names are illustrative. The Site gateway forwards calls; the optional independently running agent lives locally and needs separate explicit setup/start. Use the printed authenticated HTTPS endpoint remotely, never a localhost control URL. Illustrated keys are placeholders; never screenshot real ones. Building a local package does not update an installed Site/plugin. Follow [Setup](../source/SETUP.md).
 
 ## 7. Broader workflow concept
 
-![Concept for an expanded bridge with Docker and application adapters](images/07-expanded-workflow-concept.png)
+![Expanded bridge, Docker and application-adapter concept](images/07-expanded-workflow-concept.png)
 
-**Concept, not a current feature inventory.** A Docker manager, automatic pulls, desktop application screenshots/control, and an autonomous task manager are not implemented in 3.1.1. Permission decisions remain local; the gateway does not grant them. Application access will require selected adapters.
+3.2 implements local Docker preparation/create/attach controls, selected skill/MCP adapters and durable tasks with an optional local runner. Image preparation is explicit, not automatic. Arbitrary desktop screenshots/input and application discovery are not automatic capabilities: a selected adapter defines app access. Permissions remain local. ChatGPT resumes saved work on the next prompt; automatic task-event prompts are not enabled.
 
 ## 8. Expanded architecture concept
 
-![Expanded architecture, job flow, Docker and application-control concepts](images/08-expanded-architecture-concept.png)
+![Expanded architecture, job flow, Docker and application concepts](images/08-expanded-architecture-concept.png)
 
-**Concept, not a current implementation specification.** Its automatic image preparation, desktop control, durable audit/session system, generic API names, and `source/ui` / `source/docker` layout are proposed concepts. Snapshot workspace mounts are writable, despite the pictured read-only label. See the [proposed upgrade direction](../source/docs/roadmap.md) for the selected staged approach.
+This remains a concept rather than an implementation specification. Actual modules live under `source/bridge/server/` and `source/worker/`; generic tool names/layout labels are illustrative. Snapshot mounts are writable copies despite the pictured read-only label; live Docker maps the real project. SQLite tasks/checkpoints and local runner budgets are implemented, but not unlimited durable audit, arbitrary GUI control or automatic ChatGPT continuation. Consult [Architecture](../source/ARCHITECTURE.md) and [release scope](../source/docs/roadmap.md).
 
 ## Original filename map
 

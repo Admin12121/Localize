@@ -97,8 +97,28 @@ class Workspace:
             if fd is not None: os.close(fd)
             for api,handle in reversed(handles): api.CloseHandle(handle)
 
+    def absent_parent(self,parts):
+        for index,part in enumerate(parts):
+            with self.parent(parts[:index]) as (directory,parent):
+                try:info=os.stat(part,dir_fd=directory,follow_symlinks=False) if directory is not None else (parent/part).lstat()
+                except FileNotFoundError:return True
+                if linked(info) or not stat.S_ISDIR(info.st_mode):raise WorkspaceError('Parent is not a regular directory.')
+        return False
+
+    def make_directories(self,relative):
+        parts=self.parts(relative,True);created=[]
+        for index,part in enumerate(parts):
+            with self.parent(parts[:index]) as (directory,parent):
+                try:
+                    os.mkdir(part if directory is not None else parent/part,mode=0o755,dir_fd=directory)
+                    created.append('/'.join(parts[:index+1]))
+                except FileExistsError:pass
+            with self.parent(parts[:index+1]):pass
+        return created
+
     def _read(self, relative):
         parts=self.parts(relative)
+        if self.absent_parent(parts[:-1]):return None
         with self.parent(parts[:-1]) as (directory,path):
             return self._read_at(directory,path,parts[-1])
 
@@ -188,13 +208,51 @@ class Workspace:
             self.edits[key]={'path':path,'text':text,'expected':actual,'expires':time.monotonic()+300,'diff':diff}
             return {'edit_id':key,'path':path,'diff':diff,'expected_sha256':actual,'approval_required':True,'expires_in_seconds':300}
 
+    def _publish_existing(self,directory,parent,leaf,temp,expected):
+        """Displace only a checked source; never overwrite a competing creator.
+
+        Windows denies writers while the native helper hashes and moves its
+        pinned source. POSIX cannot exclude writers holding old descriptors:
+        retain that original inode for recovery even after successful publish.
+        """
+        from file_operations import FileOperations
+        # The shared native primitive needs only workspace, not the operation
+        # registry/runtime directory used by FileOperations' public interface.
+        renamer=FileOperations.__new__(FileOperations);renamer.workspace=self
+        backup='.web-bridge-backup-'+secrets.token_hex(16)
+        identity=renamer._native_rename(leaf,backup,directory,parent,directory,parent,('file',expected),self)
+        recovery=(parent/backup).relative_to(self.root).as_posix()
+        try:
+            try:moved=self._read_at(directory,parent,backup) if os.name!='nt' else None
+            except (OSError,WorkspaceError):moved=None
+            if os.name!='nt' and (moved is None or sha(moved)!=expected):
+                try:
+                    renamer._native_rename(backup,leaf,directory,parent,directory,parent,sourcews=self,source_identity=identity)
+                except (OSError,WorkspaceError):
+                    raise WorkspaceError('File changed during edit; competing contents preserved. Recover the original locally from '+recovery+'.') from None
+                raise WorkspaceError('File changed during edit; competing contents preserved at the original path.')
+            info=os.stat(backup,dir_fd=directory,follow_symlinks=False) if directory is not None else (parent/backup).lstat()
+            os.chmod(temp if directory is not None else parent/temp,stat.S_IMODE(info.st_mode),dir_fd=directory)
+            try:
+                os.link(temp if directory is not None else parent/temp,leaf if directory is not None else parent/leaf,src_dir_fd=directory,dst_dir_fd=directory,follow_symlinks=False)
+            except OSError:
+                raise WorkspaceError('Edit could not be published; a competing file may exist. Recover the original locally from '+recovery+'; inspect both paths before retrying.') from None
+        except OSError:
+            raise WorkspaceError('Edit interrupted after preserving the original. Recover it locally from '+recovery+'; inspect the requested path before retrying.') from None
+        if os.name=='nt':
+            try:os.unlink(parent/backup)
+            except OSError:
+                raise WorkspaceError('Edit was applied, but its original backup remains. Recover or remove it locally at '+recovery+'.') from None
+            return None
+        return recovery
+
     def apply(self,edit_id):
         with self.lock:
             edit=self.edits.pop(edit_id,None)
             if not edit or edit['expires']<=time.monotonic(): raise WorkspaceError('Edit expired or already used.')
             original=self._read(edit['path'])
             if (sha(original) if original is not None else None)!=edit['expected']: raise WorkspaceError('File changed; edit was not applied.')
-            parts=self.parts(edit['path']); temp='.web-bridge-'+secrets.token_hex(12)
+            parts=self.parts(edit['path']);self.make_directories('/'.join(parts[:-1])); temp='.web-bridge-'+secrets.token_hex(12);recovery=None
             with self.parent(parts[:-1]) as (directory,parent):
                 try:
                     fd=os.open(temp if directory is not None else parent/temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,'O_BINARY',0),0o600,dir_fd=directory)
@@ -202,18 +260,16 @@ class Workspace:
                         stream.write(edit['text'].encode());stream.flush();os.fsync(stream.fileno())
                     current=self._read_at(directory,parent,parts[-1])
                     if (sha(current) if current is not None else None)!=edit['expected']:raise WorkspaceError('File changed during edit; competing contents were preserved.')
-                    if original is not None:
-                        info=os.stat(parts[-1],dir_fd=directory,follow_symlinks=False) if directory is not None else (parent/parts[-1]).lstat()
-                        if linked(info): raise WorkspaceError('File changed during edit.')
-                        os.chmod(temp if directory is not None else parent/temp,stat.S_IMODE(info.st_mode),dir_fd=directory)
                     if original is None:
                         try:os.link(temp if directory is not None else parent/temp,parts[-1] if directory is not None else parent/parts[-1],src_dir_fd=directory,dst_dir_fd=directory,follow_symlinks=False)
                         except FileExistsError:raise WorkspaceError('File was created concurrently; competing contents were preserved.') from None
-                    else:os.replace(temp if directory is not None else parent/temp,parts[-1] if directory is not None else parent/parts[-1],src_dir_fd=directory,dst_dir_fd=directory)
+                    else:recovery=self._publish_existing(directory,parent,parts[-1],temp,edit['expected'])
                 finally:
                     try: os.unlink(temp if directory is not None else parent/temp,dir_fd=directory)
                     except FileNotFoundError: pass
-            return {'applied':True,'path':edit['path'],'sha256':sha(edit['text'].encode())}
+            result={'applied':True,'path':edit['path'],'sha256':sha(edit['text'].encode())}
+            if recovery:result['recovery_path']=recovery
+            return result
 
     def snapshot(self,destination):
         dest=Path(destination)

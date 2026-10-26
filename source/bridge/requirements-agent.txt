@@ -1,0 +1,2 @@
+# Optional local agent, Python 3.11+; no API call until locally started.
+openai==3.37.0

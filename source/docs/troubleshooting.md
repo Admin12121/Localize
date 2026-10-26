@@ -1,102 +1,97 @@
-# Troubleshooting Web-Bridge 3.1.1
+# Troubleshoot Web-Bridge 3.2
 
 [Documentation index](index.md) · [Setup](../SETUP.md) · [Usage](usage.md)
 
-## A command says completed but nothing happened
+## A command was approved but nothing happened
 
-Open the exact job in the local panel, or call `command_status` with its job ID. Keep the environment, argument array, relative working directory, state, exit code, output and snapshot/change results together when investigating. Do not share connection keys or local control codes.
+Read the existing job with `command_status`; do not submit it again. Inspect its exact command/argv, environment, shell, relative working directory, launch evidence, state, `success`, exit code, output and snapshot changes. Keep credentials and private source out of shared diagnostics.
 
-| Observed result | Meaning and next check |
+| Result | Next action |
 | --- | --- |
-| `pending` | No execution yet; review the exact command in local approvals |
-| `approved` | Approved and queued; poll until launch or a terminal result |
-| `running` | The process launched; inspect output and wait or cancel |
-| `completed`, exit code 0 | Process exited successfully; verify its intended file/service/window separately |
-| `completed`, nonzero exit code | Command failed despite the current misleading state label; inspect its output |
-| `failed` | Launch/execution raised an error; check executable, working directory, permissions and Docker |
-| `cancelled` | Cancellation, timeout, pause or policy revocation may have stopped the operation; the current state does not distinguish all reasons |
-| `denied` / `expired` | The pending command did not receive valid permission to run |
+| `pending` | Approve locally; nothing ran yet |
+| `approved` | Wait/poll; launch is queued |
+| `running` | Read incremental output; wait or cancel |
+| `completed`, `success: true`, exit 0 | Verify the requested file, server or app state |
+| `failed` | Inspect exit/error/output; nonzero exits are failures in 3.2 |
+| `timed_out` | Check profile/request timeout and whether cleanup is pending |
+| `cancelled` | Check local cancellation, pause or policy changes; wait for cleanup |
+| `denied` / `expired` | No valid approval to launch; resolve locally |
 
-**Confirmed defect:** the current runner assigns `completed` after a process exits without checking whether its exit code is zero. A temporary-fixture diagnostic reproduced `completed` with exit code 7. This is recorded for repair, not fixed by these docs. It does not establish the cause of every no-effect command.
+The old 3.1 outcome-label defect is fixed: an exit of 7 is `failed` with `success: false`. A transport response or approval still does not establish success. A successful CLI exit does not establish a GUI window or healthy background service.
 
-Also check:
+Use `output_offset` with the previous `next_output_offset` for incremental text. `truncated` means bounded output is incomplete. `cleanup_pending: true` means process cleanup has not settled even though cancellation/timeout is visible. Wait before competing writes. Services started outside the bridge's process ownership require separate lifecycle checks.
 
-- **Wrong environment:** omitting `environment` currently chooses a Docker snapshot, not the host. A result in that temporary copy is not automatically a host change.
-- **Wrong working directory:** `cwd` is relative to the selected project. An empty value means its root. Files may have been written somewhere other than expected by the program.
-- **Missing application/environment:** host execution receives a minimal environment. A terminal's active virtual environment, credentials or custom variables may not be present.
-- **Shell assumptions:** an argument array does not expand pipes, redirection or shell built-ins. Use an explicit shell only when its exact invocation is intended and approved. Windows batch wrappers need explicit `cmd.exe` invocation.
-- **Unapplied changes:** Docker results can be pending proposals or conflicts. Inspect every change; deletions and new nested directories do not sync today.
-- **GUI assumptions:** a successful CLI exit does not prove an interactive window appeared. Check application state separately.
+## Wrong environment or shell
 
-Do not repeatedly resubmit a pending or ambiguous command. Poll its existing job ID; resubmitting can duplicate effects.
+The command profile is chosen locally. Omitting `environment` follows it; a conflicting explicit environment is rejected. Read `bridge_status` after permission saves rather than assuming host or Docker. `cwd` is relative to the selected project and is not a filesystem security boundary.
 
-## Verified Windows command-launch behavior
+Use `command` plus the installed shell for pipes, redirects, built-ins and ordinary terminal syntax. Use `argv` only for an exact native executable and separate arguments; never supply both. A whole command line is not an executable name.
 
-A disposable-project check using the actual runner found that Python, Node, Git, explicit PowerShell, explicit Command Prompt, and npm through an explicitly approved Command Prompt invocation executed successfully. Direct `npm`/`npx`, bare shell built-ins such as `dir`, bare PowerShell cmdlets such as `New-Item`, and a whole command string supplied as an executable were rejected. This explains important classes of failure without proving the contents of earlier chat requests.
-
-The current interface expects an executable and separate argument strings. `npm`/`npx` resolve to Windows batch launchers, which it deliberately rejects unless an explicit shell is requested. Shell built-ins/cmdlets require their shell. A general shell-command interface with visible environment selection is a proposed upgrade, not an existing feature.
-
-The same check ran a real Docker Node command. Its output file remained a proposal until local edit approval, then appeared in the original project. Always distinguish process execution from file application.
+On Windows, npm/npx often resolve to batch launchers. Exact-argv mode rejects `.cmd`/`.bat`; use `command: "npm --version"` with `shell: "cmd"` and a compatible locally selected profile. PowerShell cmdlets require PowerShell. If PowerShell execution policy blocks a script, report that policy error and select an intended local shell rather than silently bypassing policy. Host commands receive a minimal environment; another terminal's activated environment or credentials may be missing.
 
 ## Docker commands
 
-### Docker is installed, but requests fail
+### Engine or context is unavailable
 
-The bridge status only reports whether the Docker CLI exists. Verify the engine from the same local user/session that runs the companion:
+Start Docker Desktop with Linux containers or your local Linux engine. In local controls choose **Check Docker** for live projects. Verify locally if necessary:
 
 ```sh
 docker context show
-docker context inspect --format '{{.Endpoints.docker.Host}}'
 docker info --format '{{.OSType}}'
 ```
 
-The runner currently removes user-specific environment settings. A local check found that Docker selected a different endpoint under that minimal environment than in the inherited user environment; both worked here, but context selection needs to be made explicit in the upgrade.
+The engine must report `linux` and use a supported local socket/named pipe. A stopped engine or access-denied pipe is different from a missing CLI. Live setup pins its selected context/endpoint; if it changes, reconfigure locally. Snapshot readiness resolves the local context and pins it for that job. The bridge does not switch to host execution on failure.
 
-The engine must be local (`unix://` or `npipe://`) and report `linux`. Start Docker Desktop, select Linux containers, and check access permissions. A denied engine pipe can be a session access restriction rather than a missing engine.
+### Image missing
 
-### The image is unavailable
+Snapshot mode needs one supported image already prepared locally: `python:3.12-alpine`, `node:24-alpine` or `alpine:3.21`. Pull it yourself and select the same one. For live Docker, save its chosen image and explicitly choose **Prepare image**. A remote command never silently pulls/builds an image.
 
-Prepare one supported image locally and choose the same image in the panel:
+### Existing container cannot attach
 
-```sh
-docker pull node:24-alpine
-docker image inspect node:24-alpine
-```
+Save the project and live Docker setup first. The selected running/container configuration must map that exact real host project to the configured container path. Inspect mounts and privileges locally. Socket exposure, invalid mappings and other disallowed access are rejected; some broader configurations need an explicit owner acknowledgment. Use a compatible Linux image with `sh`, `setsid` and the standard utilities required by command supervision. Stop/remove controls apply only to bridge-owned containers, not arbitrary attached environments.
 
-Other supported selections are `python:3.12-alpine` and `alpine:3.21`. There is no automatic pull/build or arbitrary image/container selector in 3.1.1.
+### Dependencies or changes disappear
 
-### There is no way to connect an existing container
+Check the mode. A snapshot is a fresh filtered copy with dependencies/Git/sensitive paths excluded, read-only container root and optional networking. It is not a reusable development environment. Use an intentionally configured live project for persistent dependencies/shared files. Live Docker modifies the real project directly; those effects do not wait for proposal approval.
 
-That capability is not implemented. The bridge creates a new short-lived container for each command. Persistent project containers, inspected mount mappings and an attachment workflow are [proposed upgrades](roadmap.md).
+### Command succeeded but original files differ
 
-### Packages or files disappear between commands
+For snapshots, inspect every `changes` entry and apply eligible proposals locally. Text edits and delete operations have distinct grants. Unsupported/excluded changes, conflicts, limits and disabled synchronization can leave differences. A retained `snapshot` artifact is evidence of unresolved work, not proof of complete sync. Inspect it locally before choosing **Discard retained snapshot**. At ten retained snapshots, review/discard before another snapshot job.
 
-Each job gets a fresh filtered copy, with dependencies, `.git`, sensitive paths and runtime state excluded. The container root is read-only and networking is off unless locally enabled. Changes to the temporary copy become at most 20 eligible text proposals when write permission is enabled. The copy is deleted after the job; it is not a persistent development environment. Read-only root filesystems and an unprivileged user can also prevent package installation.
+For live Docker, verify the actual selected mount and path. Cancellation targets the per-command execution group; it does not intentionally stop unrelated work in the attached container. A cancelled command may already have changed shared files.
 
-### Docker printed success but the real project is unchanged
+## Workspace operation rejected
 
-Inspect `changes`, apply eligible proposals locally, and read back the original files. Session writes only apply eligible supported changes. Deleted files, binary edits, new nested folders, limits and conflicts can leave the host project different from the temporary copy.
+Use the latest workspace ID and relative forward-slash paths. Select a regular local project folder rather than a drive root, home, link or runtime folder. Sensitive/excluded files, links, over-limit files and binary text edits are rejected.
 
-## Workspace errors
+Read the current hash before overwriting, moving or deleting a file. A mismatch means another change won: inspect it before proposing again. Missing parents can be created with an approved absent-file edit or `mkdir`; destination conflicts are not overwritten. Nonempty-folder deletion needs a separate recursive grant and bounded preview.
 
-Use the latest `workspace_id` from `bridge_status`. Select a regular local project folder rather than a drive root, home directory, link or runtime folder. Paths must be relative and use forward slashes. Sensitive/excluded files, linked files, binary text reads and oversized files are rejected.
+Deletion returns a recovery ID; restore with `workspace_operation` after ensuring the destination is appropriate and absent. Preserve excluded project trash and its runtime records until recovery is no longer needed. If a write returns `recovery_path`, inspect it locally: POSIX original-inode backups intentionally remain available for possible writes through pre-existing open descriptors. Do not retry an overwrite blindly or delete recovery content as part of automated cleanup.
 
-Creating a new file requires an existing parent directory. Directory creation, renaming and deletion are not exposed by current workspace tools. A hash mismatch means the file changed; read it again before proposing another edit. Do not overwrite competing changes.
+## Permissions or old jobs disappeared
 
-## Permissions or jobs keep disappearing
+Permission changes invalidate workspace IDs and pending approvals, cancel current jobs and clear proposals. Pausing revokes access without undoing completed writes. Restart requires new grants. Command receipts persist in SQLite: unfinished executions become interrupted, never automatically replayed. Inspect the recorded command/process/container identity and actual project effects in local command history. If recovery is required, stop or otherwise verify the old work locally, then choose **I checked this command is stopped**. Until that explicit review, new writes in the affected project are blocked. The dashboard keeps 200 compact rows and the newest 160 detailed receipts; older identity/idempotency tombstones can have no output. At most 30 commands may be active; wait/cancel rather than restarting to bypass the limit.
 
-Saving configuration changes and pausing revoke pending grants/jobs, clear edit proposals and replace the workspace ID. Restarting resets permissions and in-memory job history. Refresh status after every change. These are current session semantics, not durable task continuation.
+Tasks persist independently. Rebind a saved task with **Use in ChatGPT**, inspect its handoff and verify actual effects. Do not replay an old mutation merely because a response or session ended. A command check pointing to a previous session's missing job cannot prove current success.
 
-## The Site cannot connect
+## Skills or application tools are absent
 
-Keep the companion and tunnel running. Use the current printed remote HTTPS endpoint, not a localhost control URL or an endpoint from a previous Quick Tunnel. Save the key only in your own private Site. If unchanged, leave the key field blank when updating just the endpoint. Check account/workspace availability and plugin selection separately from local companion readiness.
+Enable integrations and explicitly add trusted skill folders or MCP adapters locally. The built-in skill name is `web-bridge-project-work`; a custom skill needs a readable `SKILL.md`. Skill text does not install an application or expose its tools.
 
-The local panel and RPC transport are separate listeners. Never fix a connection problem by exposing the local control port.
+MCP adapters need Python 3.11+ and the optional requirements in the **same environment that starts the companion**. Check adapter executable/arguments or HTTP endpoint, credentials and explicit allowed tool names. An empty allowlist exposes nothing. Adapter schemas are validated; calls are not automatically retried because interrupted mutations may already have occurred. Inspect the application state before retrying. Credentials stay in local configuration; do not paste them into chat.
 
-## Long-running work stops
+## Saved work will not continue
 
-Current command timeout is at most 120 seconds, output is bounded to 64,000 bytes, and a session retains at most 30 jobs. Restart requires fresh permissions and may change the tunnel endpoint. The bridge does not yet save task plans, resume jobs, run a local agent or subscribe ChatGPT to task events. A skill alone cannot extend a platform session or send another prompt after a turn ends. Both checkpoint-based ChatGPT resume and an optional local agent are in the [proposed design](superpowers/specs/2026-10-26-web-bridge-upgrade-design.md).
+ChatGPT resumes on the next prompt; this build does not enable automatic event prompts (`chatgpt_events: false`). Read `task_list` / `task_read`, then locally choose **Use in ChatGPT** if the workspace session changed. A task marked partial/blocked/awaiting approval has not completed. `task_verify` requires real supported checks; empty or manual-only checks do not automatically pass. Refine checks with `task_checkpoint` plus the latest revision while preserving requirements, or personally inspect the outcome and use **Confirm reviewed complete** locally; this records owner review, not machine verification.
+
+For the optional local agent, install its separate Python 3.11+ dependency, set the API key environment variable before launch, enter its **name**, choose an explicit model, save budgets and explicitly start the saved task. Saving/enabling alone does not call the API. Inspect budget exhaustion, pending approvals and runner evidence. API calls are separately billed; token/time/step limits are not a dollar guarantee. Another bridge writer lease can require waiting; do not run competing mutation clients.
+
+## Site cannot connect or new tools are missing
+
+Keep the companion/tunnel running. Use the current printed remote HTTPS `/mcp` endpoint, not the loopback control URL or an old Quick Tunnel. Save keys only in your private Site; leave the key field blank to retain an unchanged saved key when updating its endpoint.
+
+Check the selected Site-generated plugin and gateway version. Replacing local source/bundles does not publish an already installed Site or refresh its tool catalog. Upgrade that deployment separately while preserving identity, encryption secret, database and sharing. Never expose the local control listener as a connection workaround.
 
 ## Development checks do not start
 
-Run from the canonical source root. Install Node.js 22.13+ and Python 3.10+. If Python reports `No module named pytest`, install pytest in your development environment before running the Python suite. Build before worker tests: those tests read the generated `dist/server/index.js`. Optional real Docker/browser fixtures need their local dependencies and explicit test setup.
+Run from the canonical source root with Node.js 22.13+ and Python 3.10+. Install pytest separately. Build before worker tests because they read `dist/server/index.js`. Optional MCP/agent packages need Python 3.11+; real Docker/browser checks need their respective local installations. Record skipped optional paths accurately; never make paid API calls just to claim routine verification.

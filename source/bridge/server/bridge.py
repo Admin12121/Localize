@@ -475,7 +475,7 @@ def rpc(message, bridge):
             if missing:
                 raise BridgeError("Missing: " + ",".join(sorted(missing)))
             result = getattr(bridge, tool)(**args)
-            data = {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": bool(result.get('error'))}
+            data = {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": bool(result.get('error')) or result.get('isError') is True or result.get('state') in ('failed','timed_out','interrupted','denied','expired')}
         else:
             return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": "Method not found"}}
         return {"jsonrpc": "2.0", "id": req_id, "result": data}

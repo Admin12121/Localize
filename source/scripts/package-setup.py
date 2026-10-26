@@ -5,7 +5,7 @@ from pathlib import Path
 from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
 out=Path('outputs');out.mkdir(exist_ok=True)
 files=[Path(x) for x in ['package.json','package-lock.json','.gitignore','README.md','LICENSE','SECURITY.md','ARCHITECTURE.md','SETUP.md','CONTRIBUTING.md','bridge/README.md','drizzle.config.ts']]
-for folder,pattern in [('scripts','*.mjs'),('scripts','*.py'),('worker','*'),('bridge','*'),('bridge/server','*.py'),('bridge/tests','*.py'),('tests','*.mjs'),('db','*.ts'),('drizzle','*.sql'),('drizzle/meta','*.json'),('setup-plugin','plugin.json'),('setup-plugin/.codex-plugin','plugin.json'),('setup-plugin/skills/setup-web-bridge','SKILL.md'),('.github/workflows','*.yml'),('docs','**/*.md')]:
+for folder,pattern in [('scripts','*.mjs'),('scripts','*.py'),('worker','*'),('bridge','*'),('bridge/server','*.py'),('bridge/tests','*.py'),('bridge/skills','*/SKILL.md'),('tests','*.mjs'),('db','*.ts'),('drizzle','*.sql'),('drizzle/meta','*.json'),('setup-plugin','plugin.json'),('setup-plugin/.codex-plugin','plugin.json'),('setup-plugin/skills/setup-web-bridge','SKILL.md'),('.github/workflows','*.yml'),('docs','**/*.md')]:
     files.extend(p for p in Path(folder).glob(pattern) if p.is_file() and p.suffix not in ('.zip','.gz','.pyc') and p.name not in ('targets.json','README.md'))
 contents={p.as_posix():p.read_bytes().replace(b'\r\n',b'\n') for p in sorted(set(files))}
 manifest=json.loads(Path('.openai/hosting.json').read_text(encoding='utf-8'));manifest.pop('project_id',None)

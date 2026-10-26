@@ -65,6 +65,29 @@ def test_configuration_is_local_persistent_and_status_redacts_host_paths(project
     assert 'auth' not in json.dumps(saved).lower()
 
 
+def test_default_context_discovery_does_not_override_the_owners_active_context(project, monkeypatch):
+    docker, workspace, _, _ = project
+    original = docker._invoke
+    seen = []
+    def invoke(args, timeout=30):
+        if args == ['context', 'show']:
+            seen.append(docker._command(args))
+        return original(args, timeout)
+    monkeypatch.delenv('DOCKER_CONTEXT', raising=False)
+    monkeypatch.delenv('DOCKER_HOST', raising=False)
+    monkeypatch.setattr(docker, '_invoke', invoke)
+    assert docker.configure({'image': 'node:24-alpine'}, workspace)['context'] == 'desktop-linux'
+    assert '--config' in seen[0] and '--context' not in seen[0]
+
+
+def test_configure_refuses_to_silently_discard_a_host_override(project, monkeypatch):
+    docker, workspace, _, _ = project
+    monkeypatch.setenv('DOCKER_HOST', 'tcp://other-machine:2375')
+    monkeypatch.delenv('DOCKER_CONTEXT', raising=False)
+    with pytest.raises(WorkspaceError, match='explicit.*context'):
+        docker.configure({'image': 'node:24-alpine'}, workspace)
+
+
 def test_remote_context_rejected_and_changed_endpoint_never_mutates(project):
     docker, workspace, calls, state = project
     state['endpoint'] = 'tcp://server:2375'
@@ -143,6 +166,17 @@ def test_argv_cwd_and_unknown_cancel_are_bounded(project):
     with pytest.raises(WorkspaceError): docker.build_command('job', 'echo hi', '')
 
 
+def test_finish_forgets_terminal_tokens_without_touching_the_container(project):
+    docker, workspace, calls, _ = project
+    configure(project); docker.action('attach', workspace, container='existing')
+    docker.build_command('finished-job', ['pwd'], '')
+    calls.clear()
+    assert docker.finish('finished-job') is True
+    assert docker.finish('finished-job') is False
+    assert docker.cancel('finished-job') is False
+    assert calls == []
+
+
 def test_ownership_survives_restart_and_container_labels_must_match(project):
     docker, workspace, _, state = project
     configure(project); docker.action('create', workspace)
@@ -151,6 +185,16 @@ def test_ownership_survives_restart_and_container_labels_must_match(project):
     assert restarted.status()['owned']
     state['labels'] = {}
     with pytest.raises(WorkspaceError, match='ownership'): restarted.action('stop', workspace)
+
+
+def test_native_errors_do_not_leak_docker_paths_or_credentials(tmp_path, monkeypatch):
+    docker = DockerProject(tmp_path / 'runtime')
+    docker._binary = 'docker'
+    monkeypatch.setattr(subprocess, 'run', lambda *args, **kwargs:
+        subprocess.CompletedProcess(args[0], 1, '', 'secret-password /private/docker/config.json'))
+    with pytest.raises(WorkspaceError, match='engine is unavailable') as error:
+        docker._invoke(['info'])
+    assert 'secret-password' not in str(error.value) and '/private' not in str(error.value)
 
 
 @pytest.mark.skipif(os.environ.get('WEB_BRIDGE_DOCKER_TEST') != '1', reason='Explicit real local Docker fixture')
@@ -169,17 +213,30 @@ def test_real_docker_persistent_mount_and_attached_command_cancellation(tmp_path
         assert completed.returncode == 0, completed.stderr
         assert completed.stdout.strip() == '/workspace'
         assert (root / 'roundtrip.txt').read_text() == 'from-container'
-        docker.action('attach', workspace, container=created)
+        # A separate registry attaches this fixture container without inheriting
+        # the creator's ownership record. Its cancel path must still be safe.
+        attached = DockerProject(tmp_path / 'attached-runtime')
+        attached.configure({'image': 'node:24-alpine'}, workspace)
+        assert not attached.action('attach', workspace, container=created)['owned']
         # Existing environment process must survive cancellation of a separate exec group.
         unrelated = subprocess.Popen(docker._command(['exec', created, 'sh', '-c', 'sleep 60']), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        running = subprocess.Popen(docker.build_command('cancel-me', ['node', '-e',
-            "require('fs').writeFileSync('started.txt','yes'); setInterval(()=>{},1000)"], ''), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        running = subprocess.Popen(attached.build_command('cancel-me', ['node', '-e',
+            "const fs=require('fs'),cp=require('child_process'); const child=cp.spawn('node',['-e',`setTimeout(()=>require('fs').writeFileSync('escaped.txt','bad'),2500);setInterval(()=>{},1000)`]);fs.writeFileSync('started.txt',JSON.stringify({pid:process.pid,child:child.pid}));setInterval(()=>{},1000)"], ''), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         deadline = time.monotonic() + 10
         while not (root / 'started.txt').exists() and time.monotonic() < deadline: time.sleep(.05)
         assert (root / 'started.txt').exists()
-        assert docker.cancel('cancel-me')
+        assert attached.cancel('cancel-me')
         running.wait(timeout=10)
+        # Both the main exec and its ordinary child must be gone; an unrelated
+        # process in the same attached container remains alive.
+        identities = json.loads((root / 'started.txt').read_text())
+        check = subprocess.run(docker._command(['exec', created, 'sh', '-c',
+            'for p in "$@"; do test ! -e /proc/$p/stat || test "$(awk \'{print $3}\' /proc/$p/stat)" = Z || exit 1; done',
+            'check-owned', str(identities['pid']), str(identities['child'])]), capture_output=True, timeout=10)
+        assert check.returncode == 0, check.stderr
         assert unrelated.poll() is None
+        for action in ('stop', 'remove'):
+            with pytest.raises(WorkspaceError, match='owned'): attached.action(action, workspace)
         assert docker.status()['running']
         assert docker.action('logs', workspace)['logs'] == ''
     finally:

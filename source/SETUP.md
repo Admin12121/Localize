@@ -1,55 +1,67 @@
-# Set up Web-Bridge
+# Set up Web-Bridge 3.2
 
 [README](README.md) · [Usage](docs/usage.md) · [Troubleshooting](docs/troubleshooting.md)
 
-This guide describes **version 3.1.1**. Each owner uses their own private Site and local companion. Existing-container attachment and a Docker setup wizard are proposed upgrades, not steps available in this release.
+Each owner uses their own private Site and companion. All project access, command environment selection and integration grants happen locally.
 
 ## Requirements
 
 | Component | When needed |
 | --- | --- |
-| ChatGPT account/workspace with Sites, plugin creation and build/file tools | Provisioning your private gateway; availability depends on the account |
-| Python 3.10+ | Running and packaging the companion |
-| [cloudflared](https://developers.cloudflare.com/tunnel/downloads/) | Default remote connection from the private Site |
-| Local Docker engine using Linux containers | Container commands only |
-| Local Playwright and Chromium | Optional browser actions only |
-| Node.js 22.13+ | Building/developing the Site source |
+| ChatGPT account/workspace with Sites, plugin creation and build/file tools | Private gateway provisioning; availability depends on the account |
+| Python 3.10+ | Core companion and packaging; no core pip dependency |
+| [cloudflared](https://developers.cloudflare.com/tunnel/downloads/) | Default remote tunnel |
+| Local Linux Docker engine | Snapshot or live Docker commands |
+| Playwright + Chromium | Optional browser actions |
+| Python 3.11+ and `bridge/requirements-integrations.txt` | Optional MCP adapters (`mcp==2.3.0`) |
+| Python 3.11+ and `bridge/requirements-agent.txt` | Optional local API agent (`openai==3.37.0`) |
+| Node.js 22.13+ | Source builds/development |
 
 ## 1. Provision your private Site
 
-Use the trusted `Web-Bridge-Setup-Plugin.zip` release asset in a build-capable Sites chat. Where plugin ZIP import is supported, import it and invoke **Web-Bridge Setup** explicitly. A request such as “Use Web-Bridge Setup to deploy my own private Site from this package and return its generated plugin” identifies the intended workflow.
+Use the trusted `Web-Bridge-Setup-Plugin.zip` release package in a build-capable Sites chat. Where ZIP import is supported, import it and explicitly invoke **Web-Bridge Setup**: “Deploy my own private Site from this package and return its generated plugin.”
 
-The workflow copies sanitized source, creates an account-owned private Site, configures a fresh encryption secret, builds/publishes it, and returns that Site's generated plugin. Importing the setup package by itself does not deploy anything. If a required account capability is unavailable, report it rather than connecting to another owner's private Site.
+The workflow copies sanitized source, creates an account-owned private Site, configures a fresh encryption secret, builds/publishes it and returns that Site's generated plugin. Import alone does not deploy it. If account capabilities are missing, resolve that setup requirement rather than using another owner's private gateway.
 
-## 2. Start your companion
-
-Download `Web-Bridge.pyz` from your trusted release or private Site. The core bundle needs no pip installation or extraction.
+## 2. Start the companion
 
 ```powershell
-# Windows
+# Windows, downloaded bundle
 python .\Web-Bridge.pyz
 ```
 
 ```sh
-# macOS / Linux
+# macOS / Linux, downloaded bundle
 python3 Web-Bridge.pyz
 ```
 
-The bundle starts a Quick Tunnel by default. Add `--local-only` to disable tunneling. For development from this source directory, run `python bridge/launch.py --tunnel` instead; the source launcher only starts a tunnel when requested.
+No extraction or pip installation is required for core features. The bundle creates a Quick Tunnel by default; add `--local-only` to disable it. From the source root use `python bridge/launch.py --tunnel` instead. Source launches do not tunnel unless requested.
 
-Keep this process running. The terminal prints a local control panel address/code and a remote Site endpoint/connection key. These are different credentials with different purposes.
+Keep the process running. The terminal prints the local control panel URL/code and the remote Site endpoint/connection key. Enter each only in its intended local or private Site form. Never tunnel the control panel.
 
-## 3. Select the local project and permissions
+## 3. Select the project and command profile
 
-Open the printed loopback control panel and sign in with its local control code. Choose a project directory and a friendly alias. Start with read/search, then enable text writes and command requests if needed.
+Open the printed loopback panel and unlock it with its local control code. Select a regular local project folder and alias. Enable read/search, and enable writes, commands or integrations only as needed.
 
-Optional session writes apply eligible text changes without approving every proposal. Host command execution remains separately enabled and requires exact local approval for every command. Pause revokes current access and pending work; it does not undo already applied changes. Configuration changes revoke existing approvals and replace the workspace ID.
+Choose the command environment explicitly:
 
-Never expose the control panel through the tunnel. The authenticated RPC endpoint is the only remote transport endpoint.
+| Profile | Behavior |
+| --- | --- |
+| This computer (`host`) | OS-account execution; enable host access and approve every exact command |
+| Isolated snapshot (`container`) | Fresh filtered Docker copy; eligible changes reconcile through proposals |
+| Live Docker project (`docker`) | Persistent mapped real project; configure it below first |
 
-## 4. Prepare Docker if you want container commands
+Choose an installed shell: PowerShell/PowerShell 7/Command Prompt on Windows, or `sh`/`bash` as appropriate. Both Docker modes require `sh` or `bash` inside their Linux image. Set default/max timeouts; defaults are 600/3,600 seconds and neither may exceed 3,600.
 
-Start Docker Desktop in Linux-container mode or a local Linux Docker engine. In a local terminal, verify readiness:
+Text session writes, folder-operation session approval, recursive deletion, and container-command session approval are separate options. The container approval option applies to snapshot and live Docker jobs; host jobs always need individual approval. Live Docker commands directly share files, so text/operation proposal toggles do not constrain what an approved live command writes.
+
+Saving permissions replaces the workspace ID and revokes pending work. Pausing stops current access; it cannot undo changes already made. After restart, grant access again.
+
+## Docker modes
+
+### Isolated snapshot
+
+Start Docker Desktop in Linux-container mode or a local Linux Docker engine. Prepare a supported image locally and select it under Isolated commands:
 
 ```sh
 docker info --format '{{.OSType}}'
@@ -57,32 +69,61 @@ docker pull node:24-alpine
 docker image inspect node:24-alpine
 ```
 
-The first command should report `linux`. Select `node:24-alpine` under isolated commands in the companion panel and enable command requests. You can instead prepare/select `python:3.12-alpine` or `alpine:3.21`. The bridge checks that the selected image exists and uses its inspected image ID. It does not pull an image automatically or fall back to host execution.
+The engine must report `linux`. Supported snapshot selections are `python:3.12-alpine`, `node:24-alpine` and `alpine:3.21`. Snapshot execution checks the current local context and pins it for the job; it does not silently pull images or fall back to the host.
 
-Each Docker command creates a fresh container with a filtered project copy. There is no persistent project-container connection to configure in 3.1.1. Files in the original project change only when eligible proposals are applied. Dependencies and Git data are excluded from snapshots; ordinary full-project builds may therefore need additional preparation and may exceed the 120-second limit. See [Docker troubleshooting](docs/troubleshooting.md#docker-commands).
+The original folder is not mounted in snapshot mode. Source exclusions and size limits apply. Inspect every reconciliation result and approve eligible text/operation proposals. Unresolved changes retain a local artifact; review it before using **Discard retained snapshot**. Ten retained snapshots block additional snapshot jobs until inspected/discarded.
 
-## 5. Connect the Site
+### Persistent live Docker project
 
-Open your private Site's connection page. Paste the **remote HTTPS Site endpoint** and **connection key** printed by your companion into that form. Do not paste them into chat, issues, Git, or screenshots. A localhost control URL is not a remote Site endpoint.
+1. Save the selected project and command permissions first.
+2. Under **Live Docker project**, choose a local Docker context, image, container project path (for example `/workspace`) and explicit network setting. Save setup and choose **Check Docker**.
+3. If the image is missing, choose **Prepare image** to explicitly download it. No request triggers an automatic pull or build.
+4. Choose **Create project container**, or enter an existing container ID/name and choose **Attach selected container**.
+5. Existing containers must already map the selected host project to the configured container path. Inspect broader access locally; attachment may need the explicit broader-access acknowledgment. The bridge rejects socket exposure and invalid mappings.
+6. Save the **Live Docker project** command profile with `sh` or `bash`. Call `docker_status` and run a harmless check.
 
-Select your Site-generated plugin in ChatGPT. Call `bridge_status`, check its version, workspace, permissions and pause state, then use its current `workspace_id` for workspace operations.
+The selected context/endpoint and project mapping are pinned and checked. The live mount is the real project, including files excluded from snapshot/file tools; command effects do not wait for edit proposals. Installed dependencies and container state persist. Start/log actions are local; stop/remove are restricted to bridge-owned containers. Removing a managed container keeps host project files. Cancellation targets the command's execution group rather than stopping a shared attached container.
 
-## 6. Verify actual behavior
+## 4. Connect and verify
 
-1. Read a small known project text file and compare its contents.
-2. Submit a harmless print command in the intended environment using the [usage examples](docs/usage.md).
-3. Approve it locally if required and poll its returned job ID.
-4. Check exit code, output and the requested effect. `pending` or `approved` is not execution; `completed` can currently contain a nonzero exit code.
-5. If testing a file edit, approve it and read the file back from the real workspace. A proposed edit or Docker snapshot result alone does not prove synchronization.
+Open your private Site connection page and save the printed remote HTTPS endpoint/key. A localhost control URL is not a Site endpoint. Select your Site-generated plugin, then:
 
-## Update an existing installation
+1. Call `bridge_status`; verify version, project alias, pause state, permissions and command profile.
+2. Read a known small text file with its current `workspace_id`.
+3. Submit a harmless [command example](docs/usage.md), approve if required, and poll its returned job ID.
+4. Confirm `success`, `exit_code`, output and the intended effect. A failed command is now `failed`; timeout and cancellation are separate.
+5. If testing a write, inspect its apply result and read back the real project. A snapshot process exit alone does not prove all changes synchronized.
 
-Stop the companion with Ctrl+C, replace its bundle, then restart. To reuse an older source/ZIP installation's runtime key, run the new bundle from the old folder with `python Web-Bridge.pyz --runtime .runtime` (`python3` on macOS/Linux).
+## 5. Optional selected skills and MCP applications
 
-Permissions must be selected again. Quick Tunnel URLs can change at restart; update the Site endpoint. Leave the connection key field blank to retain the saved key when it is unchanged. Keep an existing private Site's identity, encryption secret and database when upgrading that deployment; use new identity/secrets for a new owner's deployment.
+Enable **Allow selected skills and MCP tools** locally. The built-in `web-bridge-project-work` skill is available through `skill_list` / `skill_read`. Add additional trusted folders containing `SKILL.md`; resources stay scoped to each selected folder.
 
-## Source export and privacy
+For MCP, install the optional package into the same Python environment that launches the companion, using Python 3.11+:
 
-From the source root, run the development checks in [CONTRIBUTING](CONTRIBUTING.md), then use `outputs/web-bridge-portable-source.zip` or `python scripts/export-repository.py` for sanitized source. Portable hosting configuration omits the original project ID. Runtime state, selected project data and credentials must never enter releases.
+```sh
+python -m pip install -r bridge/requirements-integrations.txt
+```
 
-For a supported tool's limits or unexpected results, use [Usage](docs/usage.md) and [Troubleshooting](docs/troubleshooting.md). Proposed future behavior is described separately in [Upgrade direction](docs/roadmap.md).
+Add an application adapter locally: name, stdio executable/arguments or Streamable HTTP URL, explicit allowed tool names, and timeout. An empty tool allowlist permits no tools. Supply credentials only in the local environment/header fields. `mcp_tools` discovers selected tools; `mcp_call` validates their schemas and does not automatically retry interrupted calls. A skill does not install an app or adapter; no general desktop GUI control is enabled automatically.
+
+## 6. Save work and optionally start a local agent
+
+Create a task with acceptance checks and checkpoint evidence/handoff. ChatGPT can resume it on the next prompt via `task_list` / `task_read`. After a session change, select **Use in ChatGPT** in the local Saved work panel to rebind it. Manual/text acceptance criteria do not machine-verify automatically; after personally reviewing results the owner can use **Confirm reviewed complete** locally, which records owner review. Automatic ChatGPT event prompts are not enabled in this build.
+
+For independent API-backed continuation, install the separate optional dependency using Python 3.11+:
+
+```sh
+python -m pip install -r bridge/requirements-agent.txt
+```
+
+Set the API key in an environment variable **before launching the companion**. In Optional local agent, enter only the variable's name (such as `OPENAI_API_KEY`), select an explicit available model, and save step/time/token limits. Save/enable alone makes no API call. Explicitly start a saved task locally; API usage is separately billed and budgets do not guarantee a fixed dollar cost. Approvals and writer leases still apply. Cancel locally when needed.
+
+## Upgrade from 3.1
+
+Stop the old companion, replace its bundle and restart. To reuse an older source installation's runtime/key intentionally, pass `--runtime .runtime` from that old installation folder. Do not run two companions against the same runtime.
+
+Permissions reset: reselect the project and explicitly save the environment/shell/timeouts and separate text, operation, recursive-delete and container grants. Do not assume the old implicit Docker behavior. Use the new `workspace_id`; resume/rebind saved work through local controls. Job history is session state and old running jobs are not resumed.
+
+Quick Tunnel URLs can change; update the private Site endpoint. Leave its key field blank to retain an unchanged saved key. Preserve the existing private Site identity, encryption secret and database when upgrading it. Rebuild/redeploy its gateway and regenerate/update its plugin to expose the new tool catalog; replacing a local bundle does not publish that deployment.
+
+Use sanitized source/release outputs for distribution, never runtime folders or selected project contents. See [Contributing](CONTRIBUTING.md) for checks and packaging.

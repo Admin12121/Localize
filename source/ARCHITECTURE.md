@@ -1,107 +1,98 @@
 # Architecture
 
-Web-Bridge has two runtime halves: a private ChatGPT Site worker and a Python companion running on the owner's computer. A reusable setup plugin helps owners deploy **their own** Site; it is not part of a live request.
+Web-Bridge 3.2 has a private ChatGPT Site gateway and a Python companion on the owner's computer. The setup plugin provisions an owner's Site; it is not part of each runtime request.
 
-## Request path
+## Request and control paths
 
 ```text
-ChatGPT → Site-generated MCP plugin
-           │
-           ▼
-worker/runtime.js (private Site)
-  - identifies the signed-in Site user
-  - validates the tool schema
-  - loads that user's encrypted connection settings
-  - forwards JSON-RPC/MCP over authenticated HTTPS
-           │
-           ▼
-cloudflared Quick Tunnel (optional for remote access)
-           │
-           ▼
-bridge/server/bridge.py (authenticated loopback RPC)
-           │
-           ▼
-bridge/server/companion.py
-  ├─ approved-origin HTTP and optional browser operations
-  ├─ selected-project listing, text read/search/edit
-  └─ approved command jobs (Docker or host)
+ChatGPT → Site-generated MCP plugin → worker/runtime.js
+                                      ├─ authenticates Site user
+                                      ├─ validates tool schema
+                                      └─ decrypts saved connection and forwards RPC
+                                                        ↓ authenticated HTTPS
+                                             optional cloudflared tunnel
+                                                        ↓
+bridge/server/bridge.py → companion.py + project_services.py
+                          ├─ scoped files / recoverable operations
+                          ├─ host, snapshot and live Docker jobs
+                          ├─ selected skills / MCP adapters
+                          ├─ SQLite tasks / writer leases / optional runner
+                          └─ approved HTTP / optional Chromium
+
+Separate loopback control.py + control.html
+  → owner-only project/grants/approvals, Docker, adapters, tasks and runner setup
 ```
 
-The local control UI is a **separate loopback listener**, not an endpoint that should be exposed by the tunnel. Permission changes, project selection, target origins, host-command approvals, and session revocation are local-only.
+Only authenticated RPC is exposed by the tunnel. The local control listener remains loopback-only. No MCP tool changes project selection, grants permissions, configures an adapter, approves a host job or starts the optional agent on the owner's behalf.
 
 ## Source ownership
 
 | Source | Responsibility |
 | --- | --- |
-| `worker/runtime.js` | Site UI routes, MCP surface, authentication, connection forwarding |
-| `worker/interface.html` | Private Site connection interface |
-| `bridge/launch.py` | RPC/control startup, authenticated tunnel, runtime credentials |
-| `bridge/bundle-entry.py` | Single-file `.pyz` extraction and independent runtime directory |
-| `bridge/server/bridge.py` | Bounded RPC / target HTTP plumbing |
-| `bridge/server/companion.py` | Local tool routing and permission enforcement |
-| `bridge/server/control.py` | Owner-facing control-plane API |
-| `bridge/server/workspace.py` | Scoped and filtered workspace operations |
-| `bridge/server/jobs.py` | Command lifecycle, approvals, container execution |
-| `bridge/server/network.py` | Target network handling |
-| `bridge/server/oauth.py` | Authentication support |
-| `bridge/BRIDGE_TOOLS.json` | Tool contracts shared into the built worker |
-| `db/schema.ts`, `drizzle/` | Connection storage schema and migrations |
-| `setup-plugin/` | Guided creation of a new account-owned Site |
-| `scripts/` | Build, packaging, validation, local preview |
+| `worker/runtime.js`, `worker/interface.html` | Private Site routes, authentication, encrypted connections, MCP forwarding |
+| `bridge/launch.py`, `bridge/bundle-entry.py` | RPC/control startup, tunnel, private runtime and bundle extraction |
+| `bridge/server/bridge.py` | Bounded authenticated RPC and approved-target HTTP plumbing |
+| `bridge/server/companion.py` | Session permissions, tool routing and command profile enforcement |
+| `bridge/server/project_services.py` | File/Docker/integration/task coordination and writer leases |
+| `bridge/server/control.py`, `bridge/control.html` | Owner-only setup, approvals and local task/runner controls |
+| `bridge/server/workspace.py` | Filtered scoped reads/search, hash-checked text edits, platform-safe publication |
+| `bridge/server/file_operations.py` | Bounded mkdir/move/delete/restore with recovery and collision checks |
+| `bridge/server/command_launch.py` | Explicit shell text versus exact executable/argv resolution |
+| `bridge/server/jobs.py`, `bridge/server/process_group.py` | Job approvals, process evidence/output, outcomes, cancellation and snapshot reconciliation |
+| `bridge/server/docker_project.py` | Pinned local context, persistent mapped project/container lifecycle and per-exec cancellation |
+| `bridge/server/integrations.py` | Selected skill roots, optional stdio/HTTP MCP sessions, allowlists/schema validation/redaction |
+| `bridge/server/task_store.py` | SQLite tasks/checkpoints/evidence, revisions, project rebinding and writer leases |
+| `bridge/server/agent_runner.py` | Optional explicit API runner, budgets, checkpointing and uncertain-mutation handling |
+| `bridge/server/network.py`, `browser_process.py`, `oauth.py` | Approved networking, optional browser isolation and authentication support |
+| `bridge/skills/project-work/SKILL.md` | Built-in evidence/checkpoint workflow instructions |
+| `bridge/BRIDGE_TOOLS.json` | Canonical 27-tool contract used by the worker and companion |
+| `db/schema.ts`, `drizzle/` | Site encrypted connection storage and migrations |
+| `setup-plugin/`, `scripts/` | Provisioning, builds, packaging, validation and sanitized source export |
 
-## Security model
+## Execution and authority
 
-The Site authenticates the user and encrypts saved connection credentials using the Site's configured encryption key. The companion separately authenticates incoming RPC traffic. The Site does not have a tool that can grant local file, CTF, host-execution, or network permissions.
+The local profile selects environment, shell and default/max timeout. `command_request` accepts shell text or exact argv, never both. A conflicting explicit environment is rejected. Jobs are submitted once with a session idempotency key, approved under local policy, and polled by ID. Nonzero exit is `failed`; zero exit is `completed`; timeout/cancellation are distinct. `success`, exit/output/launch evidence and `cleanup_pending` separate process outcome from cleanup and task verification.
 
-The locally selected workspace bounds **workspace tools** and staged container copies, not approved host commands. Host commands execute with the computer user's privileges after exact local approval. Docker uses a filtered copy rather than a mount of the entire selected project; networking is an independent local permission.
+Host jobs always need exact local approval and run as the OS account. Workspace scope and file exclusions do not sandbox them. Snapshot and live Docker jobs may use the local container-command session grant. Command timeouts default to 600 seconds and are capped by the owner-selected maximum up to 3,600 seconds. Output is bounded; the dashboard retains 200 compact rows and the newest 160 detailed durable receipts. SQLite records queue/launch identity and outcomes before/after execution. Restart never reruns a receipt: potentially unfinished work becomes interrupted with outcome-unknown recovery evidence. Fresh grants are required; prior-session command details are local inspection only. New writes in the affected project remain blocked until the owner confirms that interrupted work is stopped/reviewed.
 
-The CTF HTTP client can contact only locally approved origins, with controlled redirects and DNS behavior. The browser and HTTP sessions do not share cookies.
+| Mode | Project access | Lifecycle |
+| --- | --- | --- |
+| Host | Real files under OS-account authority, beyond workspace scope | Owned process group/Windows job; per-command approval |
+| Snapshot | Filtered copy at `/workspace`; read-only root, writable staged project | Fresh container; bounded reconciliation proposals; unresolved artifacts retained |
+| Live Docker | Validated bind mount of selected real project, broader than file-tool filters | Persistent locally created/attached container; context/endpoint pinned; per-exec cancellation |
 
-A Site plugin, local tunnel, and connection key are all needed for remote operations. Treat the connection key and local control code as secrets. Runtime state must never be committed or copied into a public release.
+Live Docker setup/image preparation/attachment are local actions. No automatic pull/build or host fallback occurs. The selected real mount must match; socket exposure is rejected. Broader attached configuration requires local inspection/acknowledgment where supported. Stop/remove only applies to bridge-owned containers. A live command's changes are direct, not an edit proposal.
 
-## Execution lifecycle
+## Files and recovery
 
-1. The model submits a command once, supplying the active workspace identifier and an idempotency key.
-2. The companion checks its current permissions, records a bounded job, and requests approval when required.
-3. The owner approves **exact** host-command arguments locally; container commands follow the configured container policy.
-4. The model polls the job ID, rather than submitting duplicates.
-5. Tool output and eligible changes are returned with explicit state. A successful exit code does not prove a visible desktop window or completion of a higher-level task.
+File tools use relative paths, reject excluded/sensitive/link paths and enforce bounded UTF-8 content. Existing text edits and file move/delete require current hashes. Approved absent-file creates can make missing parents. Folder operations have separate approval/session policy and recursive deletion needs its own grant.
 
-Jobs and permission grants are session-scoped. See [Companion reference](bridge/README.md) for limits and runtime details.
+Windows writes/renames use pinned native handles; Linux and macOS moves use native exclusive-rename primitives rather than overwrite-prone replacement. macOS code still requires native execution verification. POSIX text publication retains the original inode as a reported `recovery_path`, preserving possible late writes through an external process's open descriptor. Recoverable deletion moves content into excluded project trash with local runtime records; restore validates content and destination conflicts.
 
-## Building and release boundaries
+Snapshots are bounded to 50 MB/5,000 entries. Reconciliation reports unsupported, excluded, conflicting and excess changes and retains the local artifact when unresolved. Ten retained snapshots require inspection/discard before new snapshot jobs. Success of a command does not imply complete synchronization.
 
-Run commands from the **source root**, not the extracted release folder.
+## Integrations and durable work
+
+Core runs on Python 3.10+ without pip packages. Optional MCP adapters use Python 3.11+ and pinned MCP 2.3.0; the optional runner separately uses OpenAI 3.37.0. Skills are selected read scopes plus built-in workflow instructions; they do not provide applications or grant tools. MCP sessions are explicitly configured stdio/Streamable HTTP, expose an allowlist, validate tool arguments, redact configured credentials, and do not retry potentially mutating calls.
+
+SQLite tasks persist intent, acceptance checks, handoff and evidence with revisions and checkpoints. A writer lease coordinates bridge mutations and command lifecycles across ChatGPT and the runner; external editors are handled by conflict checks, not controlled by that lease. After a new workspace session, local **Use in ChatGPT** rebinds a saved task. Interrupted mutations are inspected, not replayed. `task_verify` checks current file contents/hash or successful current-session job evidence. Unsupported/manual checks do not automatically pass. Checkpoint refinement preserves existing requirements and requires the current revision. The owner may explicitly confirm reviewed completion locally; that records owner-review evidence separately from machine verification.
+
+ChatGPT resumes on the next prompt. This build declares `chatgpt_events: false`; it does not subscribe a chat to automatic task prompts. The optional local runner starts only by an explicit owner action with configured model, API-key environment-variable name and step/time/token budgets. It uses the same permissions/approvals and separately billed API access. Budgets are not a dollar guarantee.
+
+## State and release boundaries
+
+Credentials, Docker/integration configuration and task SQLite data persist in the private runtime. Grants, approvals, job history and idempotency receipts remain session state. Recovery/trash/snapshot artifacts can contain private project content and are not release inputs.
 
 ```text
-scripts/package-bridge.py    → outputs/Web-Bridge.pyz
-                             → outputs/web-bridge-companion.zip
-scripts/package-setup.py     → outputs/web-bridge-setup-plugin.zip
-                             → outputs/web-bridge-portable-source.zip
-scripts/build.mjs            → dist/server/index.js
-                             → dist/.openai/hosting.json
-scripts/package-release.py   → outputs/Web-Bridge-Open-Source-Release.zip
-                             → outputs/SHA256SUMS
+scripts/package-bridge.py  → outputs/Web-Bridge.pyz
+                          → outputs/web-bridge-companion.zip
+scripts/package-setup.py   → outputs/web-bridge-setup-plugin.zip
+                          → outputs/web-bridge-portable-source.zip
+scripts/build.mjs          → dist/server/index.js + hosting configuration
+scripts/package-release.py → outputs/Web-Bridge-Open-Source-Release.zip
+                          → outputs/SHA256SUMS
 ```
 
-The portable-source ZIP is sanitized for publication and fresh Site setup. The companion bundle and setup plugin are **generated output**. Do not edit them independently or include private Site identity, workspace state, or credentials when making a release.
+Build from the canonical source root. Generated bundles/distribution copies are rebuilt, not independently edited. Sanitized portable source omits deployment identity and runtime data. Large repository illustrations stay outside its text documentation payload. Building artifacts does not publish an installed Site/plugin.
 
-## Current limitations
-
-The bridge does not expose desktop screenshots, GUI input, long-lived interactive terminal APIs, unrestricted shell access, or permission changes through MCP. File tools handle bounded UTF-8 files; arbitrary binary edits and filesystem deletion are not exposed as file tools. Container availability and optional browser support depend on local installations.
-
-[README](README.md) · [Setup](SETUP.md) · [Security](SECURITY.md)
-
-## Current execution and synchronization gaps (3.1.1)
-
-The job runner currently sets `completed` after a process exits even when its exit code is nonzero. The RPC `isError` flag is based on an `error` field, so callers must inspect the job's exit code, output and requested effect. Approval is permission to launch, not proof of execution. A local temporary-fixture check reproduced an exit code of 7 with state `completed`; a separate command successfully wrote a proof file. The original reported no-effect command has not yet been reproduced through the full ChatGPT path.
-
-Container jobs are fresh filtered snapshots, not live project containers. The staged `/workspace` mount is writable while the container root filesystem is read-only. Reconciliation proposes at most 20 eligible text changes when writes are enabled; it does not apply deletions or create missing parent directories. The stage is removed after execution. There is no existing-container attachment or persistent dependency environment.
-
-Commands currently have a 120-second ceiling, 64,000-byte output bound and 30-job session cap. Job and edit state is in memory. No local skill registry, upstream MCP client, autonomous runner, durable task store or MCP Events subscription API is implemented. These gaps are tracked in the [proposed upgrade design](docs/superpowers/specs/2026-10-26-web-bridge-upgrade-design.md).
-
-## Documentation ownership
-
-The enclosing repository README and `docs/images/` contain the supplied illustrations. Their captions distinguish conceptual labels and future features from the current implementation. Source documentation is self-contained text so its portable archive and embedded setup plugin do not require the large image assets. The packaging manifest includes source setup, architecture, contributor, companion and nested documentation files.
-
-Use [Usage](docs/usage.md) for actual tool arguments and limits, [Troubleshooting](docs/troubleshooting.md) for result interpretation, and [Documentation index](docs/index.md) for the complete guide list.
+[README](README.md) · [Setup](SETUP.md) · [Usage](docs/usage.md) · [Security](SECURITY.md)

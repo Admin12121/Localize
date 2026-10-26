@@ -1,70 +1,69 @@
 # Web-Bridge
 
-**A private ChatGPT Site gateway and locally controlled Python companion.**
+**A private ChatGPT Site gateway and locally controlled companion for project work.**
 
-Version **3.1.1** · Windows, macOS and Linux · Created by **admin12121** · [MIT](LICENSE)
+Version **3.2.0** · Windows, macOS and Linux · Created by **admin12121** · [MIT](LICENSE)
 
-Use ChatGPT to inspect a selected project, propose UTF-8 text changes, send requests to approved websites, and request commands in temporary Docker containers or on the host. The local owner selects the project and permissions, reviews operations, and can pause access.
-
-## How it works
+Inspect and change a selected project, request commands on the host or in Docker, use selected skill/MCP adapters, and save tasks with evidence for later continuation. The local owner chooses permissions, command profiles, integrations and approvals.
 
 ```text
 ChatGPT → your private Site / MCP gateway → authenticated HTTPS
                                                 ↓
                                   local Python companion
-                                    ├─ approved web targets
-                                    ├─ selected project files
-                                    └─ approved command jobs
+                                    ├─ selected project and saved tasks
+                                    ├─ approved web targets / MCP adapters
+                                    └─ host, snapshot or live Docker jobs
 
-Separate loopback control panel → project, permissions, approvals, pause
+Separate loopback panel → project, grants, approvals, Docker setup, pause
 ```
 
-The Site validates and forwards tool calls. Local policy decides whether they can run. The authenticated RPC endpoint can be tunneled; the control panel must stay local.
+The Site validates and forwards tool calls. It cannot grant local access. Tunnel only authenticated RPC, never the local control panel.
 
 ## Connect
 
-1. Create your own private Site through the setup workflow in [SETUP.md](SETUP.md). Your account needs the relevant Sites/plugin/build capabilities; importing a plugin alone does not deploy a Site.
-2. Install Python 3.10+ and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Download `Web-Bridge.pyz` from your private Site or trusted release.
-3. Run `python Web-Bridge.pyz` on Windows, or `python3 Web-Bridge.pyz` on macOS/Linux. No pip installation or extraction is needed for core companion features.
-4. Open the printed local control panel, enter its local control code, select a project, and enable the capabilities you want.
-5. Paste the printed Site endpoint and connection key only into your private Site's connection form. Keep the companion running.
-6. Select your Site-generated plugin in ChatGPT, call `bridge_status`, then verify a read or approved command result.
+1. Provision your own private Site using [SETUP](SETUP.md). Importing the setup plugin alone does not deploy a Site.
+2. Install Python 3.10+ and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Download the trusted `Web-Bridge.pyz`.
+3. Run `python Web-Bridge.pyz` on Windows or `python3 Web-Bridge.pyz` on macOS/Linux. Core features need no pip installation or extraction.
+4. Open the printed local panel, enter its control code, select a project, and save permissions and a command profile.
+5. Store the printed remote endpoint/key only in your private Site's connection form. Select its generated plugin in ChatGPT and call `bridge_status`.
+6. Verify a known file read and a harmless approved command in the chosen environment. Keep the companion running.
 
-The bundle starts a Quick Tunnel by default. `--local-only` disables that tunnel. A source checkout can run `python bridge/launch.py --tunnel` from this directory. Use `python3` on macOS/Linux.
+The bundle starts a Quick Tunnel by default; `--local-only` disables it. From this source root, use `python bridge/launch.py --tunnel`; the source launcher tunnels only when requested.
 
-## Capabilities and limits
+## Capabilities
 
-| Area | Implemented in 3.1.1 |
+| Area | Implemented in 3.2 |
 | --- | --- |
-| Workspace | List, literal search, UTF-8 read and proposed edits; new files in existing directories |
-| Commands | Asynchronous submission, local approval, polling/output, cancellation; Docker snapshot or host |
-| HTTP labs | Approved origins, requests, forms, cookies, bounded request history |
-| Optional browser | Approved-origin Chromium actions with locally installed Playwright |
-| Controls | Project/permission selection, approvals, pause and revocation |
+| Workspace | Bounded list/search/read, hash-checked text edit/nested create, mkdir, move, recoverable delete/restore |
+| Commands | Shell text or exact argv; explicit local profile; launch evidence, success/failure, timeout/cancel, incremental output |
+| Docker | Filtered snapshot jobs or persistent live project; local engine/image/container setup and validated attachment |
+| Integrations | Built-in project-work skill, selected skill folders, allowlisted stdio/HTTP MCP tools |
+| Saved work | SQLite tasks, checkpoints/evidence/handoff, single-writer leases and file/command verification |
+| Continuation | ChatGPT resume on the next prompt; optional explicitly started API-backed local runner |
+| HTTP/browser | Approved-origin requests/forms/session evidence; optional scoped Chromium |
 
-Host commands use the OS account and can reach beyond the selected project. They require exact local approval every time. Docker commands use a filtered temporary copy and one of three pre-pulled Linux images. Networking and automatic text-change application are separate local options.
+Host commands use your OS account and always require exact per-command approval. Live Docker shares the real project and can mutate it directly. Snapshot changes need applicable text/operation permissions; unsupported or unresolved changes retain a local artifact. Reading a skill does not install tools or grant application access.
 
-Current commands are limited to 120 seconds, 64 KB output, and 30 retained jobs per session. File tools handle up to 256 KB per text file. There is no folder-creation, rename, deletion, binary-edit, existing-container attachment, local MCP client, or autonomous continuation API yet. Docker snapshot deletions are not applied to the original project.
+Default command timeout is 600 seconds; the local maximum can be set up to 3,600 seconds. Output is bounded to 64,000 bytes; detailed history rolls at 200 jobs with session idempotency receipts. Text files are bounded to 256,000 bytes; snapshots to 50 MB/5,000 entries. See [Usage](docs/usage.md) for exact limits and all 27 tools.
 
-**Known issue:** `completed` can accompany a nonzero command exit. Check exit code, output and the requested effect. Approval alone is never proof of execution. See [troubleshooting](docs/troubleshooting.md).
+Automatic ChatGPT event prompts are **not enabled** (`chatgpt_events: false`). Skills cannot extend platform limits. The optional local agent uses separately configured API credentials and step/time/token budgets; these are not a fixed-price guarantee. No API call is needed for core use or saving agent setup.
 
 ## Documentation
 
 - [Documentation index](docs/index.md)
-- [Setup and upgrades](SETUP.md)
-- [Usage, tool examples and limits](docs/usage.md)
+- [Setup and upgrading from 3.1](SETUP.md)
+- [Usage and tool examples](docs/usage.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [Architecture and source ownership](ARCHITECTURE.md)
+- [Architecture](ARCHITECTURE.md)
 - [Companion reference](bridge/README.md)
-- [Proposed upgrades and continuation modes](docs/roadmap.md)
-- [Contributing and verification](CONTRIBUTING.md)
-- [Security and reporting](SECURITY.md)
+- [Release scope and remaining work](docs/roadmap.md)
+- [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md)
 
-The enclosing development checkout also contains an illustrated repository README and a diagram gallery. This portable-source README is self-contained and does not depend on those large image assets.
+This source package is self-contained text. Repository illustrations are intentionally excluded from the embedded setup payload.
 
 ## Develop
 
-Run from this source root. Requires Node.js 22.13+ and Python 3.10+; pytest is a separate development dependency.
+Run from this source root. Requires Node.js 22.13+ and Python 3.10+; optional MCP and local-agent dependencies require Python 3.11+.
 
 ```sh
 npm ci
@@ -78,15 +77,15 @@ python scripts/package-release.py
 ```
 
 ```text
-bridge/          Python companion, local controls, workspace and job services
-worker/          Site interface and MCP gateway
-db/, drizzle/    Connection schema and migrations
+bridge/          Python companion, local controls, jobs, integrations and tasks
+worker/          Private Site interface and MCP gateway
+db/, drizzle/    Encrypted connection schema and migrations
 setup-plugin/    Private-Site provisioning workflow
-scripts/         Build, packaging, validation and source export
-tests/           Worker tests; bridge/tests/ contains Python tests
-docs/            Usage, troubleshooting and proposed upgrade design
+scripts/         Build, packaging, validation and sanitized source export
+tests/           Worker tests; Python tests live in bridge/tests/
+docs/            User guides and dated design/implementation records
 ```
 
-Generated artifacts go to `dist/` and `outputs/`. Export a clean source-first checkout with `python scripts/export-repository.py`; an existing destination is never overwritten. Publish `.pyz` and ZIP artifacts as release assets. Do not edit generated distribution copies independently.
+Generated artifacts go to `dist/` and `outputs/`; rebuild rather than editing distribution copies. `python scripts/export-repository.py` exports sanitized source and refuses an existing destination. Updating local packages does not publish an installed Site/plugin.
 
-Keep runtime credentials, connection records, tunnel logs, and selected project data out of Git. This software has not been independently security audited. Work only on projects and targets you own or are authorized to use.
+Keep credentials, runtime directories, tunnel logs and selected project data out of Git/releases. Work only on authorized projects and targets. This project has not been independently security audited.
