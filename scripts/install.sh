@@ -16,6 +16,8 @@ trap 'exit 1' HUP INT TERM
 fetch() { curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 2 "$1" --output "$2"; }
 find_uv() {
     if command -v uv >/dev/null 2>&1; then command -v uv
+    elif [ -n "${UV_UNMANAGED_INSTALL:-}" ] && [ -x "$UV_UNMANAGED_INSTALL/uv" ]; then printf '%s\n' "$UV_UNMANAGED_INSTALL/uv"
+    elif [ -n "${CARGO_DIST_FORCE_INSTALL_DIR:-}" ] && [ -x "$CARGO_DIST_FORCE_INSTALL_DIR/uv" ]; then printf '%s\n' "$CARGO_DIST_FORCE_INSTALL_DIR/uv"
     elif [ -n "${UV_INSTALL_DIR:-}" ] && [ -x "$UV_INSTALL_DIR/uv" ]; then printf '%s\n' "$UV_INSTALL_DIR/uv"
     elif [ -x "$HOME/.local/bin/uv" ]; then printf '%s\n' "$HOME/.local/bin/uv"
     else return 1

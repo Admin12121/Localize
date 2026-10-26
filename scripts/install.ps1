@@ -11,7 +11,7 @@ $wheel = 'localizeit-3.2.0-py3-none-any.whl'
 function Find-LocalizeUv {
     $command = Get-Command uv -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
-    foreach ($directory in @($env:UV_INSTALL_DIR, (Join-Path $HOME '.local\bin'))) {
+    foreach ($directory in @($env:UV_UNMANAGED_INSTALL, $env:CARGO_DIST_FORCE_INSTALL_DIR, $env:UV_INSTALL_DIR, (Join-Path $HOME '.local\bin'))) {
         if ($directory -and (Test-Path -LiteralPath (Join-Path $directory 'uv.exe'))) {
             return (Join-Path $directory 'uv.exe')
         }
@@ -23,11 +23,16 @@ $uv = Find-LocalizeUv
 if (-not $uv) {
     Write-Host 'Installing uv from its official installer (current user, no administrator access)...'
     $previousNoModify = $env:UV_NO_MODIFY_PATH
+    $previousInstallDirectory = $env:UV_INSTALL_DIR
     try {
+        if (-not $env:UV_INSTALL_DIR) { $env:UV_INSTALL_DIR = Join-Path $HOME '.local\bin' }
         if ($NoModifyPath) { $env:UV_NO_MODIFY_PATH = '1' }
         & powershell.exe -NoProfile -NonInteractive -Command 'irm https://astral.sh/uv/install.ps1 | iex'
         if ($LASTEXITCODE -ne 0) { throw 'The official uv installer failed.' }
-    } finally { $env:UV_NO_MODIFY_PATH = $previousNoModify }
+    } finally {
+        $env:UV_NO_MODIFY_PATH = $previousNoModify
+        $env:UV_INSTALL_DIR = $previousInstallDirectory
+    }
     $uv = Find-LocalizeUv
     if (-not $uv) { throw 'uv was not found after installation. See https://docs.astral.sh/uv/getting-started/installation/.' }
 }

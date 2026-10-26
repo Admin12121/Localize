@@ -38,8 +38,10 @@ For users who already have uv, the direct alternative is:
 
 ```sh
 uv tool install https://github.com/Admin12121/Localize/releases/download/v3.2.0/localizeit-3.2.0-py3-none-any.whl
-localizeit
+uv tool update-shell
 ```
+
+Open a new terminal once, then run `localizeit`.
 
 The primary package and command are both **`localizeit`**. Distribution uses [GitHub Releases](https://github.com/Admin12121/Localize/releases/tag/v3.2.0); bare `uvx localizeit` searches PyPI and is not the installation route. Individual release assets have SHA-256 checksums in `SHA256SUMS`. To remove the installed commands later, use `uv tool uninstall localizeit`; saved project configuration remains in your per-user runtime folder.
 
