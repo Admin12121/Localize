@@ -20,8 +20,8 @@ shutil.copyfile(
 )
 assets = {
     "Web-Bridge.pyz": (out / "Web-Bridge.pyz").read_bytes(),
-    "Web-Bridge-Companion.zip": (out / "web-bridge-companion.zip").read_bytes(),
-    "Web-Bridge-Setup-Plugin.zip": (out / "web-bridge-setup-plugin.zip").read_bytes(),
+    "web-bridge-companion.zip": (out / "web-bridge-companion.zip").read_bytes(),
+    "web-bridge-setup-plugin.zip": (out / "web-bridge-setup-plugin.zip").read_bytes(),
     "Web-Bridge-GitHub-Source.zip": (out / "Web-Bridge-GitHub-Source.zip").read_bytes(),
     "LICENSE": Path("LICENSE").read_bytes(),
     "README.md": portable_readme(),

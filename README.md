@@ -8,62 +8,46 @@ Read and update files, run approved host or Docker commands, connect selected sk
 
 ![System architecture](images/01-system-architecture.png)
 
-## One-command Localize launcher
+## Run Localize from GitHub
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) once. It manages Python and an isolated app environment; users do not need to clone the project, build the Site, or manage a virtual environment to run an already published companion.
-
-**Available now from this checkout:**
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) once, then run this command on Windows, macOS or Linux:
 
 ```sh
-# Build and run directly without installing the project globally
-uvx --from . localizeit
-
-# Or build/install all command aliases once, then run localize
-uv tool install .
-localize
+uvx --from https://github.com/Admin12121/Localize/releases/download/v3.2.0/localizeit-3.2.0-py3-none-any.whl localizeit
 ```
 
-**From a downloaded wheel:**
+The package and primary command are both **`localizeit`**. This downloads the versioned wheel from [GitHub Releases](https://github.com/Admin12121/Localize/releases/tag/v3.2.0), manages Python in an isolated environment, opens the local control panel and starts the authenticated tunnel. No repository clone, Node.js, global Python package installation or PyPI account is required. uv itself must be installed first.
+
+For a persistent installation, install the same GitHub wheel once, then use `localizeit`:
 
 ```sh
-uvx --from ./localizeit-3.2.0-py3-none-any.whl localizeit
+uv tool install https://github.com/Admin12121/Localize/releases/download/v3.2.0/localizeit-3.2.0-py3-none-any.whl
+localizeit
 ```
 
-The launcher opens the local panel and starts the authenticated tunnel. It reuses an installed cloudflared, or downloads the official release into a private user cache and checks its published SHA-256 before use. Subsequent launches reuse the verified cache. No administrator install is needed. Automatic tunnel preparation supports Windows x64, macOS Intel/Apple Silicon, and Linux x64/arm64; other architectures can use an existing supported cloudflared installation. Add `--local-only` for offline local controls without a tunnel/download. `--about` and `--help` never prepare dependencies.
+If your terminal cannot find the installed command, run `uv tool update-shell` and reopen the terminal. To replace an older installation, repeat the install command with `--force`. `localize` is an optional alias for `localizeit`; `web-bridge` is the legacy command and retains its explicit `--tunnel` behavior. Runtime state and permissions remain compatible with Web-Bridge 3.2.
 
-The installed commands are `localize`, `localizeit`, and the compatible `web-bridge`. The existing `web-bridge` command keeps its explicit `--tunnel` behavior. Runtime state and permissions remain compatible with Web-Bridge 3.2.
+The launcher reuses an installed cloudflared, or downloads the official release into a private user cache and verifies its published SHA-256 before use. Later launches reuse that verified cache. Automatic tunnel preparation supports Windows x64, macOS Intel/Apple Silicon, and Linux x64/arm64; other architectures can use an existing supported cloudflared installation. No administrator install is needed.
 
-**After the owner publishes the package to PyPI**, the short command will be `uvx localizeit`, or `uv tool install localizeit` followed by `localize`. Publication has not been performed by the local build. Optional adapters use `localizeit[integrations]`; the independent runner uses `localizeit[agent]`, both with Python 3.11+. For example, after publication: `uvx --python 3.12 --from "localizeit[integrations]" localizeit`.
+Append `--local-only` to the launch command for local controls without a tunnel/download. `--about` and `--help` also skip tunnel preparation. Docker must be installed and running separately only when you choose Docker execution.
 
-Docker is required only when you choose Docker execution and must be installed/running separately. The CLI cannot silently create or publish a ChatGPT Site: use the one-time setup workflow below, then install/select the generated plugin in normal ChatGPT.
+Distribution currently uses GitHub Releases. Bare `uvx localizeit` searches PyPI and is not the documented installation route. Use the full GitHub command above, or download the wheel from the release and run `uvx --from ./localizeit-3.2.0-py3-none-any.whl localizeit`. Release assets include `SHA256SUMS` for download verification.
 
-## Start
+## Connect to ChatGPT
 
-1. Install Python **3.10+** and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Docker is needed only for Docker commands. Node.js **22.13+** is needed for source builds.
-2. If you already have access to a deployed Web-Bridge plugin, install it from ChatGPT **Plugins** and use its Site connection page. Otherwise, use `web-bridge-setup-plugin.zip` in a Plugin Creator/Sites-enabled chat with build tools to create your own private Site and its generated plugin. Follow the [setup skill](Plugin/skills/setup-web-bridge/SKILL.md); use the supported local-plugin installation flow where available. A ZIP attachment or installation alone does not deploy or connect the bridge.
-3. Run the companion:
+1. If you already have access to a deployed bridge plugin, install it from ChatGPT **Plugins** and open its Site connection page. Otherwise, download `web-bridge-setup-plugin.zip` from the GitHub release and use it in a Plugin Creator/Sites-enabled chat with build tools to create your own private Site and generated plugin. Follow the [setup skill](Plugin/skills/setup-web-bridge/SKILL.md). Installing a ZIP alone does not deploy or connect the bridge.
+2. Start the companion with the `uvx` command above, or `localizeit` after persistent installation. Keep it running while ChatGPT works.
+3. Open the printed local panel and enter its control code. Select your project, permissions, command environment, shell and timeouts. Host commands need exact approval for each command.
+4. Save the printed remote HTTPS endpoint/key only in your private Site's connection form. The local control panel remains on loopback and must never be tunneled.
+5. Select the generated plugin in ChatGPT using `@`. Ask it to call `bridge_status`, read a known project file and submit a harmless command. Inspect the actual result and intended effect before relying on the connection.
 
-   ```powershell
-   # Windows
-   python .\Web-Bridge.pyz
-   ```
-
-   ```sh
-   # macOS / Linux
-   python3 Web-Bridge.pyz
-   ```
-
-4. Open the printed local panel and enter its control code. Select your project, permissions, command environment, shell and timeouts. Host commands always need exact approval for each command.
-5. Save the printed remote HTTPS endpoint/key only in your private Site's connection form. Select its generated plugin in ChatGPT and call `bridge_status`.
-6. Read a known file and submit a harmless command. Inspect its actual result and intended effect before relying on the connection.
-
-Core features need no pip installation or extraction. Keep the companion running. The bundle starts a Quick Tunnel by default; `--local-only` disables it. From the repository root, the source launcher is `python scripts/run.py --tunnel`. Never tunnel the loopback control panel.
+The companion launcher and the ChatGPT plugin have separate setup steps. A local command does not create or publish a Site/plugin. The standalone `Web-Bridge.pyz` release remains available for users who prefer to manage Python and cloudflared themselves; see the operating-system setup below.
 
 ![Build, deploy and connect](images/06-build-deploy-connect.png)
 
 ## Operating-system setup
 
-The same Python companion runs on all three desktop platforms. The manual Python/cloudflared steps below apply to downloaded `.pyz` releases; the uv-based Localize launcher manages those dependencies as described above. **Python 3.10+** is sufficient for core features; **Python 3.11+** is required for the optional MCP adapters and agent. Docker commands require a separately running **Linux-container** engine. Do not run the companion as root or as a Windows service for desktop-related behavior.
+The same Python companion runs on all three desktop platforms. The manual Python/cloudflared steps below apply only to the standalone `.pyz` alternative; the recommended GitHub/uv launcher manages those dependencies as described above. **Python 3.10+** is sufficient for core features; **Python 3.11+** is required for the optional MCP adapters and agent. Docker commands require a separately running **Linux-container** engine. Do not run the companion as root or as a Windows service for desktop-related behavior.
 
 | Platform | Prepare Python and tunnel | Docker |
 | --- | --- | --- |
@@ -77,7 +61,7 @@ For Debian/Arch Docker engine setup, follow the respective upstream or distribut
 Launch a downloaded release from a terminal:
 
 ```text
-Windows PowerShell:  py -3 .\\Web-Bridge.pyz
+Windows PowerShell:  py -3 .\Web-Bridge.pyz
 macOS:              python3 Web-Bridge.pyz
 Debian / Arch:      python3 Web-Bridge.pyz
 ```
@@ -92,8 +76,8 @@ You can check the core installation without starting network listeners using `py
 
 On **each person's computer**:
 
-1. Install uv once and download the trusted `localizeit-3.2.0-py3-none-any.whl` from the release package.
-2. Run `uvx --from ./localizeit-3.2.0-py3-none-any.whl localizeit` on Windows, macOS or Linux. The standalone alternative is `Web-Bridge.pyz` with Python/cloudflared installed as described above.
+1. Install uv once.
+2. Run the GitHub `uvx` command from **Run Localize from GitHub** above. For persistent installation, install that same wheel with `uv tool install` and run `localizeit`. The standalone alternative is `Web-Bridge.pyz` with Python/cloudflared installed as described above.
 3. Unlock the printed local panel, select the project and permissions, and choose the command environment. Docker is optional unless you choose Docker execution.
 4. In the authorized Site connection page, save **your own** printed remote endpoint and connection key. Keep the companion running.
 5. In a new ChatGPT chat, select the installed bridge with `@` and send:
@@ -104,7 +88,7 @@ On **each person's computer**:
    Inspect actual tool results before saying an action completed.
    ```
 
-**Sharing an existing deployment:** use the plugin's sharing settings for the intended people/workspace, and ensure its Site is also accessible to them. Send the supported plugin link plus the companion download and the sample prompt above. Each recipient installs the plugin and connects their own companion; sharing a plugin does not install local software or grant access to your PC. Sharing requires the applicable workspace permission. [OpenAI's sharing guide](https://learn.chatgpt.com/docs/build-plugins#share-the-plugin-with-your-team)
+**Sharing an existing deployment:** use the plugin's sharing settings for the intended people/workspace, and ensure its Site is also accessible to them. Send the supported plugin link, the GitHub release link and the sample prompt above. Each recipient installs the plugin and connects their own companion; sharing a plugin does not install local software or grant access to your PC. Sharing requires the applicable workspace permission. [OpenAI's sharing guide](https://learn.chatgpt.com/docs/build-plugins#share-the-plugin-with-your-team)
 
 **Sharing independent copies:** send `web-bridge-setup-plugin.zip` and the Localize wheel (or `Web-Bridge.pyz`). Each recipient uses the setup workflow to provision their own account-owned private Site/plugin once, then follows the steps above. Initial provisioning requires Sites/build capabilities; ordinary chat can use the connected plugin afterward. Share release assets, not your runtime folder, credentials or connection key.
 
@@ -149,12 +133,13 @@ For snapshots, explicitly prepare and select a supported image: `python:3.12-alp
 
 Enable selected skills/MCP tools locally. Load the built-in `web-bridge-project-work` through `skill_list` / `skill_read`, or select trusted folders containing `SKILL.md`. Skill text does not install dependencies, grant access or expose an application.
 
-MCP adapters and the optional local agent require Python **3.11+**. Install only the features you use into the Python environment that launches the companion:
+MCP adapters and the optional local agent require Python **3.11+**. For the GitHub launcher, request the extras in the same isolated environment:
 
 ```sh
-python -m pip install -r requirements/integrations.txt
-python -m pip install -r requirements/agent.txt
+uvx --python 3.12 --from "localizeit[integrations,agent] @ https://github.com/Admin12121/Localize/releases/download/v3.2.0/localizeit-3.2.0-py3-none-any.whl" localizeit
 ```
+
+Use only `integrations` or `agent` inside the brackets if you need one feature. For a persistent installation, use `uv tool install --python 3.12 --force` followed by that same quoted package URL. Installing extras does not grant access or start a paid model call. For source or standalone `.pyz` runs, install `requirements/integrations.txt` and/or `requirements/agent.txt` with pip into the Python environment that launches the companion.
 
 Configure application adapters locally with their stdio executable/arguments or Streamable HTTP URL, credentials and explicit allowed tool names. An empty allowlist permits nothing. `mcp_tools` discovers selected tools; `mcp_call` validates arguments and does not automatically retry interrupted calls. Inspect application state before retrying a mutation.
 
@@ -229,14 +214,22 @@ dist/           Generated gateway and release packages (ignored)
 
 There is one maintained source tree. Companion/setup ZIPs and the single-file launcher are generated into `dist/release/`; extracted distribution copies are not maintained in the checkout. Source and exported source use the same layout.
 
+Run directly from a source checkout without a global installation:
+
+```sh
+uvx --from . localizeit
+```
+
+To build and verify the gateway and release packages, use Node.js **22.13+** and Python **3.12**. The GitHub Actions themselves use Node 24; their runtime is separate from the Node version selected for project commands.
+
 ```sh
 npm ci
 npm run build
 npm run validate
 npm test
-python -m pip install pytest
+python -m pip install pytest build -r requirements/integrations.txt -r requirements/agent.txt
 python -m pytest -q tests/python
-uv build --wheel --out-dir dist/release
+python -m build --wheel --outdir dist/release
 python scripts/package-release.py
 ```
 
