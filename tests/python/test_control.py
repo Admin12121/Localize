@@ -18,11 +18,26 @@ def test_local_control_login_origin_csrf_and_separate_authority(tmp_path):
         res=conn.getresponse();status=res.status;hdr=dict(res.getheaders());body=res.read();conn.close()
         return status,hdr,json.loads(body) if body.startswith(b'{') else body
     try:
+        # Dashboard pages are a single shell with distinct browser routes.
+        # Unauthenticated pages expose only login UI; API state stays private.
+        for page in ('/', '/overview', '/workspace', '/docker',
+                     '/connections', '/activity', '/agent'):
+            status, headers, html = req(page)
+            assert status == 200
+            assert 'text/html' in headers['Content-Type']
+            assert b'id="login"' in html and b'id="content" hidden' in html
+        assert req('/does-not-exist', cookie='')[0] == 401
+        assert req('/assets/scene.svg')[0] == 401
         assert req('/api/state')[0]==401
         assert req('/api/login',{'code':'wrong'})[0]==403
         status,headers,body=req('/api/login',{'code':'private-local-login-code'})
         assert status==200 and body['csrf']
         cookie=headers['Set-Cookie'].split(';')[0]
+        status, asset_headers, svg = req('/assets/scene.svg', cookie=cookie)
+        assert status == 200
+        assert 'image/svg+xml' in asset_headers['Content-Type']
+        assert b'viewBox="0 0 1310 1105"' in svg
+        assert b'2,087' not in svg and b'Snyk Scan' not in svg
         status,state_headers,state=req('/api/state',cookie=cookie)
         assert status==200
         assert req('/api/state',cookie=cookie,extra={'If-None-Match':state_headers['ETag']})[0]==304
@@ -91,3 +106,58 @@ def test_bundle_about_metadata_does_not_start_a_companion(tmp_path):
     assert metadata['license']=='MIT' and metadata['version']=='3.2.0'
     assert not runtime.exists()
     assert Companion(None,tmp_path/'runtime').bridge_status()['creator']=='admin12121'
+
+
+def test_local_dashboard_focuses_on_one_docker_start_and_separate_views():
+    from web_bridge.resources import UI_ROOT
+    html = (UI_ROOT/'control.html').read_text(encoding='utf-8')
+    for view in ('overview','project','docker','integrations','activity','agent'):
+        assert f'id="page-{view}"' in html
+        assert f'data-view="{view}"' in html
+    assert html.count('id="docker-form"') == 1
+    assert html.count('id="docker-start"') == 1
+    assert 'Start Docker project' in html
+    assert 'dockerProgress(' in html
+    assert "action:'pull'" in html
+    assert "action:'create'" in html
+    assert "action:'start'" in html
+    assert "environment:'docker',shell:'sh'" in html
+    assert 'id="docker-check"' not in html
+    assert 'data-docker-action="pull"' not in html
+    assert 'data-docker-action="create"' not in html
+    assert html.count('id="profile-environment"') == 1
+    assert html.count('id="docker-image"') == 1
+    for route, view in (
+        ('/overview','overview'), ('/workspace','project'), ('/docker','docker'),
+        ('/connections','integrations'), ('/activity','activity'), ('/agent','agent'),
+    ):
+        assert f'<a href="{route}" data-view="{view}"' in html
+    assert "history.pushState" in html
+    assert "history.replaceState" in html
+    assert "addEventListener('popstate'" in html
+    assert "sessionStorage.setItem('localize-view'" not in html
+    # Keep advanced container removal and attachment explicitly available.
+    assert 'data-docker-action="attach"' in html
+    assert 'data-docker-action="remove"' in html
+
+
+def test_original_svg_geometry_is_used_without_example_findings():
+    import xml.etree.ElementTree as ET
+    from web_bridge.resources import UI_ROOT
+    original = (UI_ROOT / 'scene-original.svg').read_text(encoding='utf-8')
+    dashboard = (UI_ROOT / 'scene-dashboard.svg').read_text(encoding='utf-8')
+    original_root = ET.fromstring(original)
+    dashboard_root = ET.fromstring(dashboard)
+    assert original_root.get('viewBox') == dashboard_root.get('viewBox') == '0 0 1310 1105'
+    paths = lambda root: [e.attrib['d'] for e in root.iter()
+                          if e.tag == 'path' and 'd' in e.attrib]
+    assert len(paths(original_root)) == 78
+    assert paths(original_root) == paths(dashboard_root)
+    for sample in ('2,087', '1,227', '378', 'Snyk Scan', 'At Risk'):
+        assert sample not in dashboard
+    from web_bridge.resources import UI_ROOT
+    scene_script = (UI_ROOT / 'scene.js').read_text(encoding='utf-8')
+    html = (UI_ROOT / 'control.html').read_text(encoding='utf-8')
+    assert 'paintScene(s)' in scene_script and 'sceneCounts(s)' in scene_script
+    assert '__SCENE_JS__' in html
+    assert 'id="bridge-scene"' in html

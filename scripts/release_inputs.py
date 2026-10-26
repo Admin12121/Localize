@@ -16,6 +16,7 @@ TEXT = {
     ".json",
     ".html",
     ".css",
+    ".svg",
     ".ps1",
     ".sh",
     ".txt",

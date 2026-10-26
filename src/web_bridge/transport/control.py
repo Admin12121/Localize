@@ -15,6 +15,14 @@ from web_bridge.workspace.files import WorkspaceError
 from web_bridge.transport.http import BoundedHTTPServer
 
 
+# One trusted HTML application shell, served at several local dashboard routes.
+# API routes still require the owner cookie and (for writes) a CSRF token.
+CONTROL_PAGES = frozenset({
+    "/", "/overview", "/workspace", "/docker", "/connections",
+    "/activity", "/agent",
+})
+
+
 class ControlServer(BoundedHTTPServer):
     daemon_threads = True
 
@@ -78,8 +86,9 @@ class ControlHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            self.gate(login=self.path == "/")
-            if self.path == "/":
+            route = urlsplit(self.path)
+            self.gate(login=route.path in CONTROL_PAGES)
+            if route.path in CONTROL_PAGES:
                 from web_bridge.resources import UI_ROOT
 
                 root = UI_ROOT
@@ -87,8 +96,17 @@ class ControlHandler(BaseHTTPRequestHandler):
                     (root / "control.html")
                     .read_text(encoding="utf-8")
                     .replace("__STYLE__", (root / "ui.css").read_text(encoding="utf-8"))
+                    .replace("__SCENE_JS__", (root / "scene.js").read_text(encoding="utf-8"))
                 )
                 return self.send(200, page, "text/html; charset=utf-8")
+            if route.path == "/assets/scene.svg":
+                from web_bridge.resources import UI_ROOT
+                # Authenticated, loopback-only, package-owned SVG. This is
+                # never served through the remote companion RPC listener.
+                return self.send(
+                    200, (UI_ROOT / "scene-dashboard.svg").read_bytes(),
+                    "image/svg+xml; charset=utf-8",
+                )
             if self.path == "/api/state":
                 state = self.server.companion.local_state()
                 etag = (
@@ -101,7 +119,6 @@ class ControlHandler(BaseHTTPRequestHandler):
                 if self.headers.get("If-None-Match") == etag:
                     return self.send(304, b"", headers={"ETag": etag})
                 return self.send(200, state, headers={"ETag": etag})
-            route = urlsplit(self.path)
             if route.path == "/api/docker/status":
                 return self.send(
                     200,

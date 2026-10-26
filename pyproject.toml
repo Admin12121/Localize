@@ -20,7 +20,7 @@ web-bridge = "web_bridge.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-web_bridge = ["*.json", "ui/*.html", "ui/*.css", "skills/*/SKILL.md"]
+web_bridge = ["*.json", "ui/*.html", "ui/*.css", "ui/*.svg", "ui/*.js", "skills/*/SKILL.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
