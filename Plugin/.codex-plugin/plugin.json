@@ -9,7 +9,7 @@
     "defaultPrompt": "Create my own private Admin12211's Web-Bridge instance using the bundled source, fresh account-owned Site identity and new secrets."
   },
   "name": "admin12211-web-bridge-setup",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Create your own private Web-Bridge Site and plugin from bundled source, then connect the Windows, macOS, or Linux companion.",
   "author": {
     "name": "admin12121"

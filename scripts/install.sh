@@ -8,8 +8,8 @@ case "${1:-}" in
     '') ;;
     *) printf '%s\n' 'Unknown option. Use --help.' >&2; exit 2 ;;
 esac
-release='https://github.com/Admin12121/Localize/releases/download/v3.2.0'
-wheel='localizeit-3.2.0-py3-none-any.whl'
+release='https://github.com/Admin12121/Localize/releases/download/v3.2.1'
+wheel='localizeit-3.2.1-py3-none-any.whl'
 temporary=$(mktemp -d "${TMPDIR:-/tmp}/localizeit-install.XXXXXX")
 trap 'rm -rf "$temporary"' EXIT
 trap 'exit 1' HUP INT TERM
@@ -33,7 +33,7 @@ if ! uv=$(find_uv); then
     fi
     uv=$(find_uv) || { printf '%s\n' 'uv was not found after installation.' >&2; exit 1; }
 fi
-printf '%s\n' 'Downloading Localize v3.2.0 from GitHub and checking SHA-256...'
+printf '%s\n' 'Downloading Localize v3.2.1 from GitHub and checking SHA-256...'
 fetch "$release/SHA256SUMS" "$temporary/SHA256SUMS"
 fetch "$release/$wheel" "$temporary/$wheel"
 expected=$(awk -v name="$wheel" '$2==name {print $1}' "$temporary/SHA256SUMS")

@@ -10,7 +10,7 @@ ROOT=Path(__file__).resolve().parents[2]
 def test_source_entry_reports_version_without_starting_services(tmp_path):
     result=subprocess.run([sys.executable,str(ROOT/'scripts/run.py'),'--about'],cwd=tmp_path,capture_output=True,text=True,timeout=15)
     assert result.returncode==0,result.stderr
-    assert json.loads(result.stdout)['version']=='3.2.0'
+    assert json.loads(result.stdout)['version']=='3.2.1'
     assert list(tmp_path.iterdir())==[]
 
 def test_package_imports_and_authorized_workspace_rpc_from_other_directory(tmp_path):

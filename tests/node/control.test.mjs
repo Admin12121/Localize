@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {runInNewContext} from 'node:vm';
+import {runInNewContext, Script} from 'node:vm';
 const html=readFileSync('src/web_bridge/ui/control.html','utf8').replaceAll('\r\n','\n');
 function element(tag,text){return {tag,text,children:[],append(...items){this.children.push(...items)},replaceChildren(...items){this.children=items}}}
 
@@ -34,6 +34,9 @@ test('full controls bootstrap and render setup without invoking an external acti
   constructor(tag,text){this.tag=tag;this.textContent=text;this.children=[];this.dataset={};this.value='';this.disabled=false}
   append(...values){this.children.push(...values)}
   replaceChildren(...values){this.children=values}
+  addEventListener(){}
+  setAttribute(name,value){this[name]=value}
+  removeAttribute(name){delete this[name]}
   get firstChild(){return this.children[0]||null}
   querySelectorAll(selector){return this.children.filter(x=>selector==='.'+x.className)}
   insertBefore(row,cursor){const old=this.children.indexOf(row);if(old>=0)this.children.splice(old,1);const at=this.children.indexOf(cursor);this.children.splice(at<0?this.children.length:at,0,row)}
@@ -41,13 +44,26 @@ test('full controls bootstrap and render setup without invoking an external acti
  const elements=new Map();for(const match of html.matchAll(/<([a-z]+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){assert(!elements.has(match[3]),'duplicate DOM id '+match[3]);const item=new Node(match[1]);item.value=match[2].match(/\bvalue="([^"]*)"/)?.[1]||'';elements.set(match[3],item)}
  elements.get('mcp-transport').value='stdio';
  const buttons=Array.from(html.matchAll(/<button\b[^>]*data-docker-action="([^"]+)"[^>]*>/g),match=>{const item=new Node('button');item.dataset.dockerAction=match[1];return item});
- const document={getElementById:id=>{assert(elements.has(id),'missing DOM id '+id);return elements.get(id)},createElement:tag=>new Node(tag),documentElement:new Node('html'),hidden:false,addEventListener:()=>{},querySelectorAll:selector=>selector.includes('data-docker-action="')?buttons.filter(x=>['stop','remove'].includes(x.dataset.dockerAction)):buttons};
+ const document={getElementById:id=>{assert(elements.has(id),'missing DOM id '+id);return elements.get(id)},createElement:tag=>new Node(tag),documentElement:new Node('html'),hidden:false,addEventListener:()=>{},querySelector:()=>null,querySelectorAll:selector=>selector.startsWith('[data-docker-action')?buttons:[]};
  const fixture={paused:false,platform:'Windows',root:'C:/fixture',workspace:'fixture',permissions:{image:'node:24-alpine'},targets:{},jobs:[],edits:[],profile:{environment:'docker',shell:'sh',default_timeout:600,max_timeout:3600},docker:{configured:true,owned:false,ready:true},integrations:{skills:[{name:'selected'}],servers:[],mcp_available:true},runner:{configured:false,config:{enabled:false},running:[],api_key_present:false,sdk_available:true},tasks:[{task_id:'saved',intent:'Continue work',status:'pending'}]};
- let calls=0;const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
- runInNewContext(script+';render(fixture,true)',{document,fixture,localStorage:{getItem:()=>null},setTimeout:()=>1,clearTimeout:()=>{},fetch:()=>{calls++;throw Error('unexpected API call')},window:{},URL,Map,Set,JSON,Number,Object});
+ let calls=0;const script=html.match(/<script>([\s\S]*?)<\/script>/)[1].replace('__SCENE_JS__','function updateScene(){}');
+ runInNewContext(script+';render(fixture,true)',{document,fixture,localStorage:{getItem:()=>null},setTimeout:()=>1,clearTimeout:()=>{},fetch:()=>{calls++;throw Error('unexpected API call')},window:{addEventListener:()=>{},scrollTo:()=>{}},location:{pathname:'/docker'},history:{pushState:()=>{},replaceState:()=>{}},URL,Map,Set,JSON,Number,Object});
  assert.equal(calls,0);assert.equal(elements.get('profile-environment').value,'docker');
  assert.equal(elements.get('mcp-url').disabled,true);assert.equal(elements.get('mcp-command').required,true);
  assert(buttons.filter(x=>['stop','remove'].includes(x.dataset.dockerAction)).every(x=>x.disabled));
  const taskButtons=elements.get('task-list').children[0].children.at(-1).children; assert.equal(taskButtons.find(x=>x.textContent==='Resume with local agent').disabled,true); assert.equal(taskButtons.find(x=>x.textContent==='Use in ChatGPT').disabled,false);
  elements.get('mcp-transport').value='streamable_http';elements.get('mcp-transport').onchange();assert.equal(elements.get('mcp-url').disabled,false);assert.equal(elements.get('mcp-command').disabled,true);
+});
+
+
+test('packaged SVG controller parses and dashboard routes remain bookmarkable',()=>{
+ const scene=readFileSync('src/web_bridge/ui/scene.js','utf8');
+ const htmlScript=html.split('<script>')[1]?.split('</script>')[0];
+ assert(htmlScript,'dashboard script missing');
+ assert.doesNotThrow(()=>new Script(htmlScript.replace('__SCENE_JS__',scene)));
+ for(const route of ['/overview','/workspace','/docker','/connections','/activity','/agent']){
+   assert(html.includes('href="'+route+'"'),'missing dashboard route '+route);
+ }
+ assert(scene.includes('/assets/scene.svg'));
+ assert(html.includes('id="bridge-scene"'));
 });

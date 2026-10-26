@@ -1,0 +1,93 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: localize-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Match tag and package version
+        shell: bash
+        run: |
+          node -e "const p=require('./package.json');if(process.env.GITHUB_REF_NAME!=='v'+p.version)process.exit(1)"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run validate
+      - run: npm test
+      - run: python -m pip install pytest build -r requirements/integrations.txt -r requirements/agent.txt
+      - run: python -m build --wheel --outdir dist/release
+      - run: python -m pytest -q tests/python
+      - run: python scripts/package-release.py
+
+  publish:
+    name: Publish verified release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run validate
+      - run: npm test
+      - run: python -m pip install pytest build -r requirements/integrations.txt -r requirements/agent.txt
+      - run: python -m build --wheel --outdir dist/release
+      - run: python -m pytest -q tests/python
+      - run: python scripts/package-release.py
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          wheel="dist/release/localizeit-${version}-py3-none-any.whl"
+          test -f "$wheel"
+          notes="RELEASE_NOTES_${GITHUB_REF_NAME}.md"
+          if [ -f "$notes" ]; then
+            details=(--notes-file "$notes")
+          else
+            details=(--generate-notes)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            dist/release/install.ps1 \
+            dist/release/install.sh \
+            dist/release/SHA256SUMS \
+            dist/release/LICENSE \
+            dist/release/README.md \
+            "$wheel" \
+            dist/release/Web-Bridge.pyz \
+            dist/release/web-bridge-companion.zip \
+            dist/release/web-bridge-setup-plugin.zip \
+            dist/release/Web-Bridge-GitHub-Source.zip \
+            dist/release/Web-Bridge-Open-Source-Release.zip \
+            --verify-tag --title "Localize ${GITHUB_REF_NAME}" "${details[@]}"

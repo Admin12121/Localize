@@ -70,7 +70,7 @@ def test_macos_extracts_only_expected_regular_binary(tmp_path,name):
 
 def test_local_and_information_commands_never_download(tmp_path,monkeypatch,capsys):
     monkeypatch.setattr(launcher,'ensure_cloudflared',lambda:pytest.fail('Unexpected download'))
-    launcher.main(['--about']);assert json.loads(capsys.readouterr().out)['version']=='3.2.0'
+    launcher.main(['--about']);assert json.loads(capsys.readouterr().out)['version']=='3.2.1'
     calls=[];monkeypatch.setattr(launcher.cli,'main',lambda args,**kwargs:calls.append((args,kwargs)))
     launcher.main(['--local-only'])
     assert '--tunnel' not in calls[0][0] and calls[0][1]=={}
