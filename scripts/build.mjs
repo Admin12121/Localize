@@ -1,6 +1,7 @@
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 const python=process.platform==='win32'?'python':'python3';
+execFileSync(process.execPath,['scripts/check-repo.mjs'],{stdio:'inherit'});
 execFileSync(python,['scripts/package-bridge.py'],{stdio:'inherit'});
 execFileSync(python,['scripts/package-setup.py'],{stdio:'inherit'});
 const readonly=['list_targets','session_cookies','request_history','bridge_status','workspace_list','workspace_read','workspace_search','command_status','docker_status','skill_list','skill_read','mcp_tools','task_list','task_read'];

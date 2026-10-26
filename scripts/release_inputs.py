@@ -67,7 +67,7 @@ def source_payload():
     for folder in (
         "src",
         "gateway",
-        "plugin",
+        "Plugin",
         "scripts",
         "tests",
         ".github",

@@ -19,7 +19,7 @@ test('source and distribution dependencies exist', () => {
   for (const file of [
     'LICENSE', 'scripts/release_inputs.py',
     'scripts/bundle-entry.py', 'scripts/package-setup.py',
-    'plugin/skills/setup-web-bridge/SKILL.md',
+    'Plugin/skills/setup-web-bridge/SKILL.md',
   ]) {
     assert.ok(existsSync(join(process.cwd(), file)), `Missing repository source: ${file}`);
   }

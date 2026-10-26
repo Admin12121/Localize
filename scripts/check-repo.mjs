@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {assertSourcePaths} from './assert-paths.mjs';
 
 
 const required = [
@@ -9,9 +10,11 @@ const required = [
   'src/web_bridge/app.py', 'gateway/runtime.js',
   'scripts/build.mjs', 'scripts/package-setup.py',
   'scripts/package-release.py', 'tests/node/site.test.mjs',
-  'plugin/skills/setup-web-bridge/SKILL.md'
+  'Plugin/plugin.json', 'Plugin/.codex-plugin/plugin.json',
+  'Plugin/skills/setup-web-bridge/SKILL.md'
 ];
-for (const file of required) assert.ok(existsSync(join(process.cwd(), file)), `Missing source: ${file}`);
+const tracked = existsSync('.git') ? execFileSync('git', ['ls-files', '-z'], {encoding: 'utf8'}).split('\0').filter(Boolean) : [];
+assertSourcePaths(process.cwd(), required, tracked);
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const companion = JSON.parse(readFileSync('src/web_bridge/metadata.json', 'utf8'));
 const tools = JSON.parse(readFileSync('src/web_bridge/BRIDGE_TOOLS.json', 'utf8'));

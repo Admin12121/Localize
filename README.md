@@ -11,7 +11,7 @@ Read and update files, run approved host or Docker commands, connect selected sk
 ## Start
 
 1. Install Python **3.10+** and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Docker is needed only for Docker commands. Node.js **22.13+** is needed for source builds.
-2. Provision your own private Site using the trusted setup-plugin ZIP in a Sites-enabled chat with build tools. Explicitly invoke its setup workflow to deploy a private Site and return its generated plugin. Importing the ZIP alone does not deploy anything. The executable [setup skill](plugin/skills/setup-web-bridge/SKILL.md) contains the provisioning instructions.
+2. If you already have access to a deployed Web-Bridge plugin, install it from ChatGPT **Plugins** and use its Site connection page. Otherwise, use `web-bridge-setup-plugin.zip` in a Plugin Creator/Sites-enabled chat with build tools to create your own private Site and its generated plugin. Follow the [setup skill](Plugin/skills/setup-web-bridge/SKILL.md); use the supported local-plugin installation flow where available. A ZIP attachment or installation alone does not deploy or connect the bridge.
 3. Run the companion:
 
    ```powershell
@@ -31,6 +31,30 @@ Read and update files, run approved host or Docker commands, connect selected sk
 Core features need no pip installation or extraction. Keep the companion running. The bundle starts a Quick Tunnel by default; `--local-only` disables it. From the repository root, the source launcher is `python scripts/run.py --tunnel`. Never tunnel the loopback control panel.
 
 ![Build, deploy and connect](images/06-build-deploy-connect.png)
+
+## Install and share simply
+
+**Already have a shared plugin?** Open ChatGPT's **Plugins**, find it under your workspace or **Shared with me**, open it and install it. Start a new chat, type `@`, select the bridge, and follow its connection prompts. Plugin availability and sharing depend on your account/workspace. See [OpenAI's installation guide](https://learn.chatgpt.com/docs/plugins).
+
+On **each person's computer**:
+
+1. Install Python and cloudflared once. Download the trusted `Web-Bridge.pyz` from your private Site or release package.
+2. Run `python Web-Bridge.pyz` (Windows) or `python3 Web-Bridge.pyz` (macOS/Linux).
+3. Unlock the printed local panel, select the project and permissions, and choose the command environment. Docker is optional unless you choose Docker execution.
+4. In the authorized Site connection page, save **your own** printed remote endpoint and connection key. Keep the companion running.
+5. In a new ChatGPT chat, select the installed bridge with `@` and send:
+
+   ```text
+   Use this bridge. First call bridge_status and show my selected project,
+   environment and permissions. Then list the files in my project.
+   Inspect actual tool results before saying an action completed.
+   ```
+
+**Sharing an existing deployment:** use the plugin's sharing settings for the intended people/workspace, and ensure its Site is also accessible to them. Send the supported plugin link plus the companion download and the sample prompt above. Each recipient installs the plugin and connects their own companion; sharing a plugin does not install local software or grant access to your PC. Sharing requires the applicable workspace permission. [OpenAI's sharing guide](https://learn.chatgpt.com/docs/build-plugins#share-the-plugin-with-your-team)
+
+**Sharing independent copies:** send `web-bridge-setup-plugin.zip` and `Web-Bridge.pyz`. Each recipient uses the setup workflow to provision their own account-owned private Site/plugin once, then follows the steps above. Initial provisioning requires Sites/build capabilities; ordinary chat can use the connected plugin afterward. Share release assets, not your runtime folder, credentials or connection key.
+
+Build assets are in `dist/release/` after `npm run build`; `python scripts/package-release.py` also produces the combined release ZIP. Local packaging does not publish a Site or create a public one-click installation link.
 
 ## Project files and commands
 
@@ -141,7 +165,7 @@ src/web_bridge/  app.py, cli.py, resources.py
                 workspace/ execution/ integrations/ tasks/
                 web/ transport/ security/ ui/ skills/
 gateway/        Site runtime, interface, database and migrations
-plugin/         Setup-plugin metadata and functional skill
+Plugin/         Setup-plugin metadata and functional skill
 scripts/        Source entry, build and release operations
 tests/          Python and gateway/control-panel tests
 requirements/   Optional integration and agent dependencies
