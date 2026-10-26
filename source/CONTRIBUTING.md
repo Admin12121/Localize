@@ -45,3 +45,11 @@ Keep `dist/`, `outputs/`, local runtime state, and generated archives out of sou
 Do not post working exploits, live secrets, or identifying private logs in public issues. Follow the private reporting guidance in [SECURITY.md](SECURITY.md).
 
 Contributions are provided under the project's [MIT License](LICENSE).
+
+## Documentation and illustrations
+
+Keep root and source READMEs aligned about supported features. Use `docs/usage.md` for exact API examples and `docs/troubleshooting.md` for known defects. Proposed features belong in `docs/roadmap.md` and the dated design, never in a table of implemented capabilities.
+
+The enclosing repository stores the eight supplied illustrations under `docs/images/`, with captions in `docs/illustrations.md`. Preserve their bytes when renaming. Do not treat conceptual image labels as API names or silently advertise capabilities shown in an illustration.
+
+Portable-source packaging must include `SETUP.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `bridge/README.md` and all text guides under `docs/`. Repository illustrations stay outside the embedded setup payload. For documentation/packaging changes, verify relative links in the actual portable archive/export, image references/hashes in the enclosing repository, and `git diff --check`. Run build/validation and relevant existing tests when package inputs change. Keep installation instructions explicit about working directory and optional test dependencies.

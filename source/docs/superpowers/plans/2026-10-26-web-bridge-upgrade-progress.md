@@ -1,0 +1,1 @@
+# Progress: approved Web-Bridge upgrade — 2026-10-26`nImplementation started; baseline Node suite 12/12; command diagnostics reproduced. Work directly in the requested checkout. No commits or publishing.

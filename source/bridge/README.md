@@ -42,11 +42,11 @@ The control UI stays on **loopback**; do not tunnel its port. The authenticated 
 
 ## Commands and isolation
 
-**Container mode:** Install and start Docker with Linux-container support, then prepare a supported image (for example `docker pull python:3.12-alpine`). Commands work on a filtered project copy, not a bind mount of the original folder. Eligible text diffs are applied to the original only through the configured approval/write policy. Enabling container networking separately allows outbound traffic and may transmit staged source.
+**Container mode:** Install and start Docker with Linux-container support, then prepare a supported image (for example `docker pull python:3.12-alpine`). Commands work on a filtered project copy, not a bind mount of the original folder. The container root filesystem is read-only, but the staged project copy is writable. Eligible text diffs are applied to the original only through the configured approval/write policy. Deletions and missing parent directories are not applied. Each job uses a new container; persistent project environments and existing-container attachment are not available. Enabling container networking separately allows outbound traffic and may transmit staged source.
 
-**Host mode:** Runs with your OS account, not inside a sandbox. Selected folders do **not** limit which files a host command can access. Each command requires specific, single-use local approval. The process may create detached children that outlive cancellation; inspect and stop them using your OS tools if necessary.
+**Host mode:** Runs with your OS account, not inside a sandbox. Selected folders do **not** limit which files a host command can access. Each command requires specific, single-use local approval. Cancellation attempts to terminate the owned process group; processes or services outside that ownership still need separate verification. A successful CLI exit does not prove a desktop window opened or a service became healthy.
 
-Jobs last up to 120 seconds, return at most 64 KB of output, and the current session retains up to 30 jobs. Commands are queued once and polled by job ID; do not resubmit pending jobs.
+Jobs last up to 120 seconds, return at most 64,000 bytes of combined stdout/stderr, and the current session retains up to 30 jobs. Commands are queued once and polled by job ID; do not resubmit pending jobs. `pending` is awaiting approval and `approved` is queued to start, not proof that execution finished. **Known issue:** `completed` can accompany a nonzero exit code. Check the exit code, output and requested effect.
 
 ## File tools and state
 
@@ -74,3 +74,9 @@ The browser operates within approved origins. Browser and HTTP cookies are separ
 Select your **own Site-generated plugin** and run `bridge_status`, then one explicitly authorized workspace read or local CTF request. Confirm returned evidence. Installing a plugin or publishing a Site does not by itself prove that the local companion is connected.
 
 Full developer documentation is in the canonical source repository: `README.md`, `ARCHITECTURE.md`, and `SECURITY.md`. (These files are not bundled into the standalone companion ZIP.)
+
+## Operational guides and planned upgrades
+
+In a full source checkout, see [Usage](../docs/usage.md), [Troubleshooting](../docs/troubleshooting.md) and [Setup](../SETUP.md). These source guides are not bundled into the standalone companion ZIP. They explain current Docker preparation, the difference between approval/execution/application, and the known command-outcome issue.
+
+Folder creation, rename/delete tools, persistent Docker project access, local skill/MCP/application adapters and durable task continuation are proposed upgrades, not features of this bundle. Keep the companion and its grants available while ChatGPT works; restarting does not resume a saved task or previous job.

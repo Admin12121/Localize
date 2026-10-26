@@ -1,69 +1,103 @@
 # Web-Bridge
 
-**A private, owner-controlled connection between ChatGPT and your local computer.**
+**Connect ChatGPT to a project on your computer, with permissions controlled locally.**
 
-Web-Bridge consists of an authenticated MCP gateway deployed to a private ChatGPT Site and a Python companion running on Windows, macOS, or Linux. It enables ChatGPT to inspect explicitly selected projects, submit file edits, test authorized web applications, and request bounded commands. The owner controls access through a separate local panel.
+Web-Bridge combines a private ChatGPT Site, an MCP gateway, and a Python companion. It can inspect a selected project, propose text edits, send requests to approved websites, and run locally approved commands on the host or in a temporary Docker container.
 
-**Version:** 3.1.1 · **Author:** [admin12121](https://github.com/Admin12121) · **License:** MIT
+**Current version: 3.1.1** · Created by [admin12121](https://github.com/Admin12121) · [MIT license](LICENSE)
 
-## How it works
+## How the connection works
+
+![Web-Bridge connection from ChatGPT through a private Site to the local companion](docs/images/01-system-architecture.png)
+
+This illustration describes the connection concept. In 3.1.1, Docker uses pre-pulled images and temporary project copies; it does not build images or attach development containers. Host commands use your OS account and are not confined to the selected project, despite the illustration's “safe shell commands” label. The [architecture reference](source/ARCHITECTURE.md) describes the implemented boundaries.
 
 ```text
-ChatGPT + Site-generated MCP plugin
-              │
-              ▼
-Private Site gateway (worker/runtime.js)
-              │  authenticated HTTPS
-              ▼
-Cloudflare Tunnel (optional remote transport)
-              │
-              ▼
-Python companion on 127.0.0.1
-     ├── HTTP/browser → approved origins only
-     ├── Files → selected workspace only
-     ├── Docker → isolated project snapshot
-     └── Host commands → exact local approval
+ChatGPT + your Site-generated plugin
+    → private Site / authenticated MCP gateway
+    → authenticated HTTPS tunnel
+    → Python companion on your computer
+        ├─ selected project files
+        ├─ approved HTTP/browser targets
+        └─ approved Docker or host command jobs
 
-Separate local control panel: permissions, targets, job approval, pause
+Separate local control panel: project, permissions, approvals, pause
 ```
 
-The public tunnel exposes only authenticated RPC—not the local control panel. Workspace selection, CTF allowlists, command approval and revocation are enforced by the companion. Host commands are **not confined to the selected folder** and require explicit approval.
+The companion enforces local permissions. The Site cannot choose a project, grant itself access, or approve a pending command. Only the authenticated RPC endpoint belongs behind a tunnel; the local control panel stays on loopback.
 
-## Run the companion
+## What works today
 
-Install **Python 3.10+** and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Download the release asset `Web-Bridge.pyz`. The core companion needs no pip installation or extraction.
+| Area | Available in 3.1.1 | Current boundary |
+| --- | --- | --- |
+| Project files | List, literal search, UTF-8 reads and proposed edits; new files in existing directories | 256 KB/file; no folder creation, rename, deletion, or arbitrary binary editing |
+| Host commands | Real process execution after exact local approval; status and output | Uses your OS account; approval is required for each command |
+| Docker commands | Short-lived Linux containers using a filtered project snapshot | Engine and selected image must already be ready; no existing-container attachment |
+| Approved websites | HTTP requests, forms, cookies, request history | Exact approved origins; redirects are not followed |
+| Optional browser | Scoped Chromium actions | Local Playwright/Chromium installation required |
+| Local controls | Select a project, permissions, edit/job approval, pause | Grants and queued work are session-scoped |
 
-```powershell
-# Windows
-python .\Web-Bridge.pyz
-```
+Commands are currently limited to 120 seconds, 64 KB of captured output, and 30 retained jobs per companion session. Docker changes are proposals unless session write permission is enabled; deleted snapshot files are not deleted in the real project. See [usage and limits](source/docs/usage.md).
+
+**Known execution-reporting issue:** a job can return `completed` with a nonzero exit code. Check its exit code, output, and requested result before treating it as successful. This is documented for repair; it has not been fixed by the documentation update.
+
+## Start the companion
+
+You need **Python 3.10+**, [cloudflared](https://developers.cloudflare.com/tunnel/downloads/) for the remote connection, and your own private ChatGPT Site with its generated plugin. Account/workspace capabilities may vary. Docker is optional unless you want container commands.
+
+1. Deploy your own private Site using the setup workflow described in [SETUP](source/SETUP.md). Importing a plugin alone does not deploy a Site.
+2. Download `Web-Bridge.pyz` from your trusted release or private Site.
+3. Start it on your computer:
+
+   ```powershell
+   # Windows
+   python .\Web-Bridge.pyz
+   ```
+
+   ```sh
+   # macOS / Linux
+   python3 Web-Bridge.pyz
+   ```
+
+4. Open the printed local control panel. Enter its local control code, choose a project, and grant the capabilities you want.
+5. Enter the printed Site endpoint and connection key **only in your private Site's connection form**.
+6. Select your Site-generated plugin in ChatGPT. Call `bridge_status`, verify the chosen workspace, then test a read and a command result.
+
+The bundle starts a Quick Tunnel by default. Add `--local-only` to run without a tunnel. Core companion features need no pip installation or extraction. Keep the companion running while ChatGPT uses it.
+
+## Understand command execution
+
+![Host command request, local approval, execution and result polling](docs/images/02-host-command-lifecycle.png)
+
+**Approval means permission to start; it does not prove execution succeeded.** Submit a command once with an idempotency key, approve it locally if required, then poll the returned job ID. Confirm the exit code and output, and inspect the expected file or service when relevant.
+
+The illustration uses conceptual API names, a 600-second example, and an “isolated” host label. The actual API is `command_request` / `command_status`, the current ceiling is 120 seconds, and host mode is not isolated. Use the [actual tool examples](source/docs/usage.md), not the labels in the artwork.
+
+For Docker today, start Docker Desktop in Linux-container mode, prepare one of the supported images, select it locally, and enable command requests. For example:
 
 ```sh
-# macOS / Linux
-python3 Web-Bridge.pyz
+docker pull node:24-alpine
 ```
 
-The bundle starts a tunnel by default; add `--local-only` to disable it. The terminal prints a **local control code**, a **Site endpoint**, and a **connection key**. Open the printed local panel, choose the project and permissions, then enter the endpoint/key only in your **private Site connection page**. Keep secrets out of chats, screenshots and Git.
+Supported selections are `python:3.12-alpine`, `node:24-alpine`, and `alpine:3.21`. The bridge does not pull an image automatically. Its local panel currently has no container connection wizard. [Docker setup and troubleshooting](source/docs/troubleshooting.md#docker-commands) explains the current process.
 
-To create your own Site, use the release setup plugin in an account with Sites and plugin-creation access. The plugin requires an explicit deployment workflow; importing it alone does not create a Site.
+## Documentation
 
-Finally, select your Site-generated plugin in ChatGPT, call `bridge_status`, and verify an approved file read or HTTP request.
+| Guide | Purpose |
+| --- | --- |
+| [Setup](source/SETUP.md) | First connection, Docker prerequisites, upgrades, verification |
+| [Usage and tool examples](source/docs/usage.md) | File edits, commands, approvals, limits, expected results |
+| [Troubleshooting](source/docs/troubleshooting.md) | No-effect commands, pending jobs, Docker and connection problems |
+| [Architecture](source/ARCHITECTURE.md) | Source ownership, data flow, current lifecycle and boundaries |
+| [Companion reference](source/bridge/README.md) | Launch options, local permissions, runtime data, browser setup |
+| [Illustrated workflows](docs/illustrations.md) | All eight supplied diagrams, with implementation notes |
+| [Upgrade direction](source/docs/roadmap.md) | Proposed project changes and both continuation modes |
+| [Contributing](source/CONTRIBUTING.md) | Development, verification and packaging |
+| [Security](source/SECURITY.md) | Permission model and private vulnerability reporting |
 
-## Capabilities and boundaries
+## Develop from the source
 
-| Feature | Available | Limitation |
-| --- | --- | --- |
-| HTTP & CTF labs | Requests, form inspection, cookies, request history | Exact approved origins; no automatic redirects |
-| Workspace | List, search, read and edit UTF-8 text | Scoped selection, file-size limits, diff policy |
-| Container commands | Docker with filtered source snapshot | Docker engine and pre-pulled approved image required |
-| Host commands | Real OS process execution | Individual approval; unrestricted host permissions |
-| Optional browser | Scoped Chromium actions | Requires Playwright/Chromium locally |
-
-This version does **not** provide full desktop input/control, persistent interactive terminal sessions, arbitrary binary-file editing, or autonomous Docker provisioning.
-
-## Source and development
-
-This checkout currently includes the distributable folders `Companion/`, `Plugin/` and `Web-Bridge.pyz` alongside the **canonical development source in `source/`**. These distributions are generated artifacts; do not edit their copies independently. The source tree builds the companion, hosted worker, Site setup plugin and sanitized releases.
+This checkout keeps canonical development code in **`source/`**. `Companion/`, `Plugin/`, and the root `.pyz` are generated distributions; rebuild them rather than editing their copies. Repository illustrations live in `docs/images/` and are kept out of the embedded setup package to avoid adding roughly 14 MB to the hosted worker.
 
 ```sh
 cd source
@@ -72,16 +106,15 @@ npm run check:repo
 npm run build
 npm run validate
 npm test
+python -m pip install pytest
 python -m pytest -q bridge/tests
 python scripts/package-release.py
 ```
 
-Requires Node.js 22.13+ and Python 3.10+; install pytest for Python tests. Outputs are generated under `source/dist/` and `source/outputs/`. Use `python scripts/export-repository.py` from `source/` to produce a source-first GitHub checkout, and release binaries as downloadable assets instead of committing copies.
+Requires Node.js 22.13+ and Python 3.10+. On macOS/Linux use `python3` where needed. Builds go to `source/dist/` and `source/outputs/`. `python scripts/export-repository.py` exports a sanitized source-first checkout; it refuses to overwrite an existing export. Release `.pyz` and ZIP bundles as downloadable assets. Do not commit credentials, runtime folders, tunnel logs, or selected project data.
 
-## Security and disclosure
+## Upgrade status
 
-Only connect to applications and projects you own or are authorized to test. Never tunnel the local control port or commit Site connection credentials, runtime folders, tunnel logs or private workspace files. Network-enabled containers can transmit the staged source, and host commands can access anything available to the OS account.
+Reliable outcome reporting, complete file operations, persistent Docker development environments, local skill/MCP integrations, and durable task continuation are **proposed upgrades**, not capabilities of 3.1.1. Both ChatGPT resume and an optional local agent are in the [design for review](source/docs/superpowers/specs/2026-10-26-web-bridge-upgrade-design.md). The installed plugin will be updated after the project behavior is implemented and verified.
 
-See [SECURITY.md](source/SECURITY.md) for reporting. This project has not been independently audited.
-
-**MIT License** · Copyright (c) 2026 admin12121.
+Only use the bridge with projects, applications, and targets you own or are authorized to work on. This project has not been independently security audited.

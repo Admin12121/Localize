@@ -91,3 +91,17 @@ The portable-source ZIP is sanitized for publication and fresh Site setup. The c
 The bridge does not expose desktop screenshots, GUI input, long-lived interactive terminal APIs, unrestricted shell access, or permission changes through MCP. File tools handle bounded UTF-8 files; arbitrary binary edits and filesystem deletion are not exposed as file tools. Container availability and optional browser support depend on local installations.
 
 [README](README.md) · [Setup](SETUP.md) · [Security](SECURITY.md)
+
+## Current execution and synchronization gaps (3.1.1)
+
+The job runner currently sets `completed` after a process exits even when its exit code is nonzero. The RPC `isError` flag is based on an `error` field, so callers must inspect the job's exit code, output and requested effect. Approval is permission to launch, not proof of execution. A local temporary-fixture check reproduced an exit code of 7 with state `completed`; a separate command successfully wrote a proof file. The original reported no-effect command has not yet been reproduced through the full ChatGPT path.
+
+Container jobs are fresh filtered snapshots, not live project containers. The staged `/workspace` mount is writable while the container root filesystem is read-only. Reconciliation proposes at most 20 eligible text changes when writes are enabled; it does not apply deletions or create missing parent directories. The stage is removed after execution. There is no existing-container attachment or persistent dependency environment.
+
+Commands currently have a 120-second ceiling, 64,000-byte output bound and 30-job session cap. Job and edit state is in memory. No local skill registry, upstream MCP client, autonomous runner, durable task store or MCP Events subscription API is implemented. These gaps are tracked in the [proposed upgrade design](docs/superpowers/specs/2026-10-26-web-bridge-upgrade-design.md).
+
+## Documentation ownership
+
+The enclosing repository README and `docs/images/` contain the supplied illustrations. Their captions distinguish conceptual labels and future features from the current implementation. Source documentation is self-contained text so its portable archive and embedded setup plugin do not require the large image assets. The packaging manifest includes source setup, architecture, contributor, companion and nested documentation files.
+
+Use [Usage](docs/usage.md) for actual tool arguments and limits, [Troubleshooting](docs/troubleshooting.md) for result interpretation, and [Documentation index](docs/index.md) for the complete guide list.

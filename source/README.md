@@ -1,62 +1,70 @@
 # Web-Bridge
 
-Web-Bridge connects a private ChatGPT Site to an owner-controlled local companion. It exposes selected project files, approved web targets, and gated command execution through MCP without granting ChatGPT unrestricted access to the host.
+**A private ChatGPT Site gateway and locally controlled Python companion.**
 
-Built for local development and authorized security labs. Runs on Windows, macOS, and Linux.
+Version **3.1.1** · Windows, macOS and Linux · Created by **admin12121** · [MIT](LICENSE)
+
+Use ChatGPT to inspect a selected project, propose UTF-8 text changes, send requests to approved websites, and request commands in temporary Docker containers or on the host. The local owner selects the project and permissions, reviews operations, and can pause access.
 
 ## How it works
 
 ```text
-ChatGPT → private Site (MCP worker) → authenticated HTTPS tunnel
-                                          │
-                                          ▼
-                              Python companion (localhost)
-                               ├─ approved HTTP targets
-                               ├─ scoped workspace tools
-                               └─ approved Docker / host commands
+ChatGPT → your private Site / MCP gateway → authenticated HTTPS
+                                                ↓
+                                  local Python companion
+                                    ├─ approved web targets
+                                    ├─ selected project files
+                                    └─ approved command jobs
+
+Separate loopback control panel → project, permissions, approvals, pause
 ```
 
-The Site forwards tool calls; the companion enforces permissions. Project selection, target allowlists, host-command approvals, and revocation remain in a separate local control panel.
+The Site validates and forwards tool calls. Local policy decides whether they can run. The authenticated RPC endpoint can be tunneled; the control panel must stay local.
 
-## Setup
+## Connect
 
-**Requirements:** Python 3.10+ and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/) for remote connection. Docker is optional for isolated command execution. Playwright/Chromium is optional for browser tools.
+1. Create your own private Site through the setup workflow in [SETUP.md](SETUP.md). Your account needs the relevant Sites/plugin/build capabilities; importing a plugin alone does not deploy a Site.
+2. Install Python 3.10+ and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Download `Web-Bridge.pyz` from your private Site or trusted release.
+3. Run `python Web-Bridge.pyz` on Windows, or `python3 Web-Bridge.pyz` on macOS/Linux. No pip installation or extraction is needed for core companion features.
+4. Open the printed local control panel, enter its local control code, select a project, and enable the capabilities you want.
+5. Paste the printed Site endpoint and connection key only into your private Site's connection form. Keep the companion running.
+6. Select your Site-generated plugin in ChatGPT, call `bridge_status`, then verify a read or approved command result.
 
-1. **Provision your own private Site.** Use the `Web-Bridge-Setup-Plugin.zip` release asset in a ChatGPT account that supports Sites, plugin creation and build tools. The setup workflow creates an account-owned Site with new secrets. Importing the plugin alone does not deploy anything.
-2. **Start the companion.** Download `Web-Bridge.pyz` from your Site or a trusted release. No extraction or `pip install` is required for its core features.
-3. **Connect privately.** Open the local control panel URL printed in the terminal. Enter its local control code and configure allowed targets, project folder, and permissions. Paste the Site endpoint and connection key **only** into your private Site's connection form.
-4. **Verify.** Select the Site-generated plugin in a ChatGPT chat, invoke `bridge_status`, then test one authorized read or HTTP request.
+The bundle starts a Quick Tunnel by default. `--local-only` disables that tunnel. A source checkout can run `python bridge/launch.py --tunnel` from this directory. Use `python3` on macOS/Linux.
 
-```powershell
-# Windows
-python .\Web-Bridge.pyz
-```
+## Capabilities and limits
 
-```sh
-# macOS or Linux
-python3 Web-Bridge.pyz
-```
-
-The single-file companion starts an authenticated Quick Tunnel by default. Add `--local-only` to avoid starting it. A source installation can run `python bridge/launch.py --tunnel` from the repository root.
-
-Upgrading from the older source-ZIP companion? Stop the old process, then run `python Web-Bridge.pyz --runtime .runtime` from its previous directory to reuse that installation's key. Permissions reset at restart, and Quick Tunnel URLs may change. Update the endpoint in your private Site without disclosing keys in chat.
-
-## Capabilities
-
-| Area | Available operations |
+| Area | Implemented in 3.1.1 |
 | --- | --- |
-| HTTP labs | Exact-origin allowlist, requests, forms, cookies, bounded evidence, optional Chromium |
-| Workspace | List, search, read and propose UTF-8 text edits inside a selected project |
-| Commands | Bounded jobs, output/status polling, Docker isolation or exact-approved host execution |
-| Local controls | Permission selection, diff/command approvals, pause and revocation |
+| Workspace | List, literal search, UTF-8 read and proposed edits; new files in existing directories |
+| Commands | Asynchronous submission, local approval, polling/output, cancellation; Docker snapshot or host |
+| HTTP labs | Approved origins, requests, forms, cookies, bounded request history |
+| Optional browser | Approved-origin Chromium actions with locally installed Playwright |
+| Controls | Project/permission selection, approvals, pause and revocation |
 
-Host commands can access files beyond the selected project. They require local approval for each exact command and are **not sandboxed**. Docker commands use a filtered staged copy; Docker network access is a separate opt-in. Never tunnel the local control panel.
+Host commands use the OS account and can reach beyond the selected project. They require exact local approval every time. Docker commands use a filtered temporary copy and one of three pre-pulled Linux images. Networking and automatic text-change application are separate local options.
 
-**Not included:** desktop mouse/keyboard control, interactive terminal sessions, unrestricted filesystem APIs or automatic host privilege escalation.
+Current commands are limited to 120 seconds, 64 KB output, and 30 retained jobs per session. File tools handle up to 256 KB per text file. There is no folder-creation, rename, deletion, binary-edit, existing-container attachment, local MCP client, or autonomous continuation API yet. Docker snapshot deletions are not applied to the original project.
+
+**Known issue:** `completed` can accompany a nonzero command exit. Check exit code, output and the requested effect. Approval alone is never proof of execution. See [troubleshooting](docs/troubleshooting.md).
+
+## Documentation
+
+- [Documentation index](docs/index.md)
+- [Setup and upgrades](SETUP.md)
+- [Usage, tool examples and limits](docs/usage.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Architecture and source ownership](ARCHITECTURE.md)
+- [Companion reference](bridge/README.md)
+- [Proposed upgrades and continuation modes](docs/roadmap.md)
+- [Contributing and verification](CONTRIBUTING.md)
+- [Security and reporting](SECURITY.md)
+
+The enclosing development checkout also contains an illustrated repository README and a diagram gallery. This portable-source README is self-contained and does not depend on those large image assets.
 
 ## Develop
 
-Node.js 22.13+ is required for building the Site worker. Python 3.10+ is required for packaging the companion.
+Run from this source root. Requires Node.js 22.13+ and Python 3.10+; pytest is a separate development dependency.
 
 ```sh
 npm ci
@@ -64,27 +72,21 @@ npm run check:repo
 npm run build
 npm run validate
 npm test
-python -m pytest -q bridge/tests  # optional: install pytest first
+python -m pip install pytest
+python -m pytest -q bridge/tests
 python scripts/package-release.py
 ```
 
-Build output is written to `dist/` and `outputs/`. To export a GitHub-ready source checkout, run `python scripts/export-repository.py`; it creates `outputs/github-repository/` and does not overwrite an existing directory. Publish the **contents of that directory**, not the extracted release wrapper. Attach `.pyz` and ZIP distributions as GitHub Release assets.
-
 ```text
-bridge/         Python companion, control panel and local RPC
-worker/         Private Site interface and MCP gateway
-db/, drizzle/   Database schema and migrations
-setup-plugin/   Account-owned Site setup workflow
-scripts/        Packaging, verification and source export
-tests/          Worker tests; bridge/tests/ holds Python tests
+bridge/          Python companion, local controls, workspace and job services
+worker/          Site interface and MCP gateway
+db/, drizzle/    Connection schema and migrations
+setup-plugin/    Private-Site provisioning workflow
+scripts/         Build, packaging, validation and source export
+tests/           Worker tests; bridge/tests/ contains Python tests
+docs/            Usage, troubleshooting and proposed upgrade design
 ```
 
-## Security
+Generated artifacts go to `dist/` and `outputs/`. Export a clean source-first checkout with `python scripts/export-repository.py`; an existing destination is never overwritten. Publish `.pyz` and ZIP artifacts as release assets. Do not edit generated distribution copies independently.
 
-The local control listener must remain on loopback. Keep Site connection keys, local control codes, tunnel runtime logs and workspace data out of Git and public issues. Host execution and container networking can access sensitive data beyond the filtered workspace; enable them only when needed.
-
-See [SECURITY.md](SECURITY.md) for threat boundaries and private reporting. This software has not been independently security audited.
-
-## License
-
-[MIT](LICENSE) · Copyright (c) 2026 admin12121.
+Keep runtime credentials, connection records, tunnel logs, and selected project data out of Git. This software has not been independently security audited. Work only on projects and targets you own or are authorized to use.
