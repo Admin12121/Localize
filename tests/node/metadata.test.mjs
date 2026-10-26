@@ -53,14 +53,3 @@ test('release version remains consistent across installers, metadata, gateway, a
     assert(readFileSync(path, 'utf8').includes(installUrl), path + ' uses an old release URL');
   }
 });
-
-test('release requires successful CI for the tagged commit', () => {
-  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
-  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  assert(ci.includes('python -m pytest -q tests/python'));
-  assert(workflow.includes('Require green CI for exact tagged commit'));
-  assert(workflow.includes('head_sha=$commit'));
-  assert(workflow.includes('run["head_branch"] == "main"'));
-  assert(workflow.includes('run["conclusion"] == "success"'));
-  assert(!workflow.includes('python -m pytest -q tests/python'));
-});

@@ -58,7 +58,7 @@ The **v3.2.4** update simplifies the local control panel with a full-width layou
 4. If the tunnel endpoint changed, update the **Companion endpoint** on your existing private Site. Do not create a new connection key unless you intentionally rotated it.
 5. **Optional gateway refresh:** to update the Site's bundled downloads and interface, open the *existing* Site's builder session, attach `web-bridge-setup-plugin.zip` from this release, and follow [Upgrade an existing Site](#upgrade-an-existing-site). Preserve the same Site identity and existing secrets.
 
-The tool contract remains at 27 tools, so ordinary local companion updates do not require a new private Site or a new ChatGPT plugin. Saved project settings and approval policies remain local, although approvals tied to a previous runtime/session may need to be reviewed again. Do not publish a GitHub release before its Windows, macOS and Ubuntu CI jobs are green.
+The tool contract remains at 27 tools, so ordinary local companion updates do not require a new private Site or a new ChatGPT plugin. Saved project settings and approval policies remain local, although approvals tied to a previous runtime/session may need to be reviewed again. Run the local verification commands below before releasing. Tests do not run automatically on pushes, pull requests, or tag publication; optional cross-platform tests are available through **GitHub → Actions → CI → Run workflow**.
 
 If Docker says **Container no longer exists**, open the local **Docker** page and click **Recreate missing container**. This clears the stale selection and creates a new container using your selected image and project mount. Your host files are kept. A stopped container can be started again; an unavailable engine must be fixed in Docker Desktop first. To change the image or network of an existing container, use **Container management → Forget selection** to keep it, then start a new project container. Removal remains restricted to containers recorded as bridge-owned.
 
@@ -297,11 +297,13 @@ npm run build
 npm run validate
 npm test
 python -m pip install pytest build uv -r requirements/integrations.txt -r requirements/agent.txt
-python -m pytest -q tests/python
 python -m build --wheel --outdir dist/release
+python -m pytest -q tests/python
 python scripts/package-release.py
 ```
 
 Use `python3` on macOS/Linux where needed. The gateway is built into `dist/server/`; release packages go to `dist/release/`. `python scripts/export-repository.py` exports sanitized source to a new destination. Images stay in the repository; portable setup packages omit the illustrations to keep the gateway payload small.
+
+After local verification, push your changes and a matching version tag, such as `v3.2.4`. The release workflow checks the tag against `package.json`, builds and validates the gateway, builds the wheel and release archives, generates SHA-256 checksums, and publishes the GitHub release. It does not rerun tests or require a successful hosted CI run. To run the optional Windows, macOS, and Linux test matrix separately, use **Actions → CI → Run workflow**; it does not block tag publication.
 
 This README is the only explanatory Markdown file. `SKILL.md` files are executable workflow instructions required by the skills and setup plugin. Code, tests and tool schemas remain the implementation reference. No separate docs, guides or planning records are maintained.
