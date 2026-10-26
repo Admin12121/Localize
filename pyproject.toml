@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "web-bridge"
+version = "3.2.0"
+description = "Locally controlled project and CTF tools through a private MCP bridge"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.scripts]
+web-bridge = "web_bridge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+web_bridge = ["*.json", "ui/*.html", "ui/*.css", "skills/*/SKILL.md"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests/python"]

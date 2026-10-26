@@ -11,7 +11,7 @@ Read and update files, run approved host or Docker commands, connect selected sk
 ## Start
 
 1. Install Python **3.10+** and [cloudflared](https://developers.cloudflare.com/tunnel/downloads/). Docker is needed only for Docker commands. Node.js **22.13+** is needed for source builds.
-2. Provision your own private Site using the trusted setup-plugin ZIP in a Sites-enabled chat with build tools. Explicitly invoke its setup workflow to deploy a private Site and return its generated plugin. Importing the ZIP alone does not deploy anything. The executable [setup skill](source/setup-plugin/skills/setup-web-bridge/SKILL.md) contains the provisioning instructions.
+2. Provision your own private Site using the trusted setup-plugin ZIP in a Sites-enabled chat with build tools. Explicitly invoke its setup workflow to deploy a private Site and return its generated plugin. Importing the ZIP alone does not deploy anything. The executable [setup skill](plugin/skills/setup-web-bridge/SKILL.md) contains the provisioning instructions.
 3. Run the companion:
 
    ```powershell
@@ -28,7 +28,7 @@ Read and update files, run approved host or Docker commands, connect selected sk
 5. Save the printed remote HTTPS endpoint/key only in your private Site's connection form. Select its generated plugin in ChatGPT and call `bridge_status`.
 6. Read a known file and submit a harmless command. Inspect its actual result and intended effect before relying on the connection.
 
-Core features need no pip installation or extraction. Keep the companion running. The bundle starts a Quick Tunnel by default; `--local-only` disables it. From the repository root, the source launcher is `python source/bridge/launch.py --tunnel`. Never tunnel the loopback control panel.
+Core features need no pip installation or extraction. Keep the companion running. The bundle starts a Quick Tunnel by default; `--local-only` disables it. From the repository root, the source launcher is `python scripts/run.py --tunnel`. Never tunnel the loopback control panel.
 
 ![Build, deploy and connect](images/06-build-deploy-connect.png)
 
@@ -74,8 +74,8 @@ Enable selected skills/MCP tools locally. Load the built-in `web-bridge-project-
 MCP adapters and the optional local agent require Python **3.11+**. Install only the features you use into the Python environment that launches the companion:
 
 ```sh
-python -m pip install -r source/bridge/requirements-integrations.txt
-python -m pip install -r source/bridge/requirements-agent.txt
+python -m pip install -r requirements/integrations.txt
+python -m pip install -r requirements/agent.txt
 ```
 
 Configure application adapters locally with their stdio executable/arguments or Streamable HTTP URL, credentials and explicit allowed tool names. An empty allowlist permits nothing. `mcp_tools` discovers selected tools; `mcp_call` validates arguments and does not automatically retry interrupted calls. Inspect application state before retrying a mutation.
@@ -103,7 +103,7 @@ For independent continuation, configure an explicit model, API-key environment-v
 | Saved work | `task_create`, `task_list`, `task_read`, `task_checkpoint`, `task_verify` |
 | Web | `list_targets`, `http_request`, `http_batch`, `inspect_html`, `browser_action`, `session_cookies`, `request_history`, `reset_session` |
 
-The machine-readable tool catalog is `source/bridge/BRIDGE_TOOLS.json`. Local controls configure permissions, integrations, Docker and the runner; tools cannot grant themselves access.
+The machine-readable tool catalog is `src/web_bridge/BRIDGE_TOOLS.json`. Local controls configure permissions, integrations, Docker and the runner; tools cannot grant themselves access.
 
 ![Approved HTTP request lifecycle](images/05-approved-http-request.png)
 
@@ -124,7 +124,7 @@ The machine-readable tool catalog is `source/bridge/BRIDGE_TOOLS.json`. Local co
 - **New tools absent:** rebuild/redeploy the private Site gateway and update its generated plugin; replacing local files alone does not publish the installed deployment.
 - **Browser setup:** install `playwright` and run `python -m playwright install chromium` in the companion's environment if using browser tools.
 
-Use `--help` for launch options and `--runtime` to intentionally reuse an existing runtime after stopping its old process. The default bundle runtime is `%LOCALAPPDATA%/Web-Bridge/runtime` on Windows, `~/Library/Application Support/Web-Bridge/runtime` on macOS, and `$XDG_STATE_HOME/web-bridge` or `~/.local/state/web-bridge` on Linux. Grants reset on restart; credentials, configuration, tasks and receipts remain local. Quick Tunnel URLs may change; update the private Site endpoint and leave its key field blank to retain an unchanged key.
+Use `python scripts/run.py --help` for source-launch options and `--runtime` to intentionally reuse an existing runtime after stopping its old process. When migrating an older source install, explicitly pass its previous runtime path to retain its saved state; no credentials are moved automatically. All companion entry points use the same per-user runtime by default: `%LOCALAPPDATA%/Web-Bridge/runtime` on Windows, `~/Library/Application Support/Web-Bridge/runtime` on macOS, and `$XDG_STATE_HOME/web-bridge` or `~/.local/state/web-bridge` on Linux. Grants reset on restart; credentials, configuration, tasks and receipts remain local. Quick Tunnel URLs may change; update the private Site endpoint and leave its key field blank to retain an unchanged key.
 
 Never publish runtime data, credentials, recovery artifacts or selected project contents. Preserve the private Site's identity, encryption secret and database during upgrades. Use only authorized projects/targets. macOS-specific behavior has not been tested on macOS hardware; optional paid-model and real third-party app actions were not exercised in release verification.
 
@@ -134,19 +134,33 @@ The eight supplied illustrations are conceptual. Their embedded names/layouts ma
 
 ## Develop and package
 
-Development code lives in `source/` in this checkout. Exported source places those contents at its root; skip the first `cd` there and omit the `source/` prefix from paths above. `Companion/`, `Plugin/` and `Web-Bridge.pyz` are generated distributions.
+Python code lives in `src/web_bridge/`, grouped by feature. The application assembles domain services; feature action facades preserve the existing permission-controlled tool interface. MCP/HTTP transport is separate from the web client and browser behavior. The private Site gateway owns its interface, database schema and migrations under `gateway/`.
+
+```text
+src/web_bridge/  app.py, cli.py, resources.py
+                workspace/ execution/ integrations/ tasks/
+                web/ transport/ security/ ui/ skills/
+gateway/        Site runtime, interface, database and migrations
+plugin/         Setup-plugin metadata and functional skill
+scripts/        Source entry, build and release operations
+tests/          Python and gateway/control-panel tests
+requirements/   Optional integration and agent dependencies
+images/         The eight supplied README illustrations
+dist/           Generated gateway and release packages (ignored)
+```
+
+There is one maintained source tree. Companion/setup ZIPs and the single-file launcher are generated into `dist/release/`; extracted distribution copies are not maintained in the checkout. Source and exported source use the same layout.
 
 ```sh
-cd source
 npm ci
 npm run build
 npm run validate
 npm test
 python -m pip install pytest
-python -m pytest -q bridge/tests
+python -m pytest -q tests/python
 python scripts/package-release.py
 ```
 
-Use `python3` on macOS/Linux where needed. Outputs go to `source/dist/` and `source/outputs/`. `python scripts/export-repository.py` exports sanitized source to a new destination. Images stay in the repository; portable setup packages omit the illustrations to keep the gateway payload small.
+Use `python3` on macOS/Linux where needed. The gateway is built into `dist/server/`; release packages go to `dist/release/`. `python scripts/export-repository.py` exports sanitized source to a new destination. Images stay in the repository; portable setup packages omit the illustrations to keep the gateway payload small.
 
 This README is the only explanatory Markdown file. `SKILL.md` files are executable workflow instructions required by the skills and setup plugin. Code, tests and tool schemas remain the implementation reference. No separate docs, guides or planning records are maintained.
