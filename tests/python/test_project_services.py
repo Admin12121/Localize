@@ -1,11 +1,46 @@
 import os
+import json
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import time
 import pytest
 from web_bridge.app import Companion
 from web_bridge.workspace.files import WorkspaceError
 from web_bridge.transport.rpc import rpc
+
+
+def windows_process_details(process):
+    """Read only the still-live test child's CPU and thread wait states."""
+    if os.name != 'nt' or process is None or process.poll() is not None:
+        return None
+    executable = shutil.which('pwsh')
+    if not executable:
+        return {'unavailable': 'PowerShell 7 is not installed for native diagnostics'}
+    query = (
+        '$p=Get-Process -Id '+str(process.pid)+' -ErrorAction Stop; '
+        '[pscustomobject]@{pid=$p.Id;name=$p.ProcessName;'
+        'user_cpu_seconds=$p.UserProcessorTime.TotalSeconds;'
+        'kernel_cpu_seconds=$p.PrivilegedProcessorTime.TotalSeconds;'
+        'threads=@($p.Threads | Select-Object -First 40 | ForEach-Object {'
+        '$reason=$null;if ($_.ThreadState -eq "Wait") {'
+        'try {$reason=$_.WaitReason.ToString()} catch {}};'
+        '[pscustomobject]@{id=$_.Id;state=$_.ThreadState.ToString();'
+        'wait_reason=$reason;cpu_seconds=$_.TotalProcessorTime.TotalSeconds}'
+        '})} | ConvertTo-Json -Depth 4 -Compress'
+    )
+    try:
+        result = subprocess.run(
+            [executable, '-NoProfile', '-NonInteractive', '-Command', query],
+            capture_output=True, text=True, encoding='utf-8', errors='replace',
+            timeout=5, creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if result.returncode:
+            return {'unavailable': 'Native inspection exited '+str(result.returncode)}
+        return json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, ValueError) as error:
+        return {'unavailable': type(error).__name__}
 
 def ready(tmp_path,**permissions):
     root=tmp_path/'project';root.mkdir()
@@ -14,7 +49,8 @@ def ready(tmp_path,**permissions):
     return c,root
 
 def wait(c,job,timeout=10):
-    end=time.monotonic()+timeout
+    waiting_since=time.monotonic()
+    end=waiting_since+timeout
     while time.monotonic()<end:
         result=c.command_status(job['job_id'])
         if result['state'] not in ('pending','approved','running'):return result
@@ -23,16 +59,23 @@ def wait(c,job,timeout=10):
     internal=c.jobs.items.get(job['job_id'], {})
     process=internal.get('process')
     process_status=process.poll() if process is not None else 'not launched'
+    execution=result.get('execution') or {}
+    process_age=time.time()-execution['started_at'] if execution.get('started_at') else None
     try:
-        generated=sorted(item.name for item in c.workspace.root.glob('resume-*.txt'))
+        generated=sorted(item.name for item in c.workspace.root.iterdir())[:40]
     except OSError:
         generated=['unavailable']
+    elapsed=time.monotonic()-waiting_since
+    native=windows_process_details(process)
     pytest.fail(
         f"Job did not terminate within {timeout}s: state={result['state']}, "
+        f"wait_elapsed_seconds={elapsed:.3f}, "
+        f"process_age_at_deadline_seconds={process_age}, "
         f"execution={result.get('execution')}, "
         f"process_poll={process_status}, "
         f"job_object_owned={bool(internal.get('group'))}, "
         f"created_files={generated}, "
+        f"native_process={native}, "
         f"output={result.get('output', '')[-2000:]!r}, "
         f"receipt_error={result.get('receipt_error')!r}"
     )
@@ -118,7 +161,7 @@ def test_powershell_repeated_owned_launches_are_not_left_suspended(tmp_path):
     c, root = ready(tmp_path)
     try:
         for number in range(5):
-            name = f'resume-{number}.txt'
+            name = f'resume-{number}-\u03a9.txt'
             print(f'Windows PowerShell iteration {number + 1}/5', flush=True)
             job = c.command_request(
                 command=f"Set-Content -LiteralPath '{name}' -Value 'started'",
