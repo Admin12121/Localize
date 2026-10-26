@@ -94,15 +94,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                     (root / "control.html")
                     .read_text(encoding="utf-8")
                     .replace("__STYLE__", (root / "ui.css").read_text(encoding="utf-8"))
-                    .replace("__SCENE_JS__", (root / "scene.js").read_text(encoding="utf-8"))
                 )
                 return self.send(200, page, "text/html; charset=utf-8")
-            if route.path == "/assets/scene.svg":
-                from web_bridge.resources import UI_ROOT
-                return self.send(
-                    200, (UI_ROOT / "scene-dashboard.svg").read_bytes(),
-                    "image/svg+xml; charset=utf-8",
-                )
             if self.path == "/api/state":
                 state = self.server.companion.local_state()
                 etag = (
@@ -118,9 +111,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             if route.path == "/api/docker/status":
                 return self.send(
                     200,
-                    self.server.companion.docker_status(
-                        workspace_id=self.server.companion.workspace_id
-                    ),
+                    self.server.companion.local_docker_status(),
                 )
             if route.path == "/api/task":
                 return self.send(

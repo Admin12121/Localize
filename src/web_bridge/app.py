@@ -180,15 +180,9 @@ class Companion(
             )
             self.jobs.file_operations = self.file_operations
             if selected and self.docker_project._config:
-                try:
+                self.docker_state = self.docker_project.status(selected)
+                if not self.docker_state.get("error"):
                     self.docker_project.validate_workspace(selected)
-                    self.docker_state = self.docker_project.status()
-                except WorkspaceError:
-                    self.docker_state = {
-                        "configured": True,
-                        "ready": False,
-                        "error": "Docker mapping belongs to another project. Configure the selected project locally.",
-                    }
             if validated_profile is not None:
                 self.profile = validated_profile
                 self.profile_explicit = True

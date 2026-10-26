@@ -41,12 +41,12 @@ test('full controls bootstrap and render setup without invoking an external acti
   querySelectorAll(selector){return this.children.filter(x=>selector==='.'+x.className)}
   insertBefore(row,cursor){const old=this.children.indexOf(row);if(old>=0)this.children.splice(old,1);const at=this.children.indexOf(cursor);this.children.splice(at<0?this.children.length:at,0,row)}
  }
- const elements=new Map();for(const match of html.matchAll(/<([a-z]+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){assert(!elements.has(match[3]),'duplicate DOM id '+match[3]);const item=new Node(match[1]);item.value=match[2].match(/\bvalue="([^"]*)"/)?.[1]||'';elements.set(match[3],item)}
+ const elements=new Map();for(const match of html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){assert(!elements.has(match[3]),'duplicate DOM id '+match[3]);const item=new Node(match[1]);item.value=match[2].match(/\bvalue="([^"]*)"/)?.[1]||'';elements.set(match[3],item)}
  elements.get('mcp-transport').value='stdio';
  const buttons=Array.from(html.matchAll(/<button\b[^>]*data-docker-action="([^"]+)"[^>]*>/g),match=>{const item=new Node('button');item.dataset.dockerAction=match[1];return item});
  const document={getElementById:id=>{assert(elements.has(id),'missing DOM id '+id);return elements.get(id)},createElement:tag=>new Node(tag),documentElement:new Node('html'),hidden:false,addEventListener:()=>{},querySelector:()=>null,querySelectorAll:selector=>selector.startsWith('[data-docker-action')?buttons:[]};
  const fixture={paused:false,platform:'Windows',root:'C:/fixture',workspace:'fixture',permissions:{image:'node:24-alpine'},targets:{},jobs:[],edits:[],profile:{environment:'docker',shell:'sh',default_timeout:600,max_timeout:3600},docker:{configured:true,owned:false,ready:true},integrations:{skills:[{name:'selected'}],servers:[],mcp_available:true},runner:{configured:false,config:{enabled:false},running:[],api_key_present:false,sdk_available:true},tasks:[{task_id:'saved',intent:'Continue work',status:'pending'}]};
- let calls=0;const script=html.match(/<script>([\s\S]*?)<\/script>/)[1].replace('__SCENE_JS__','function updateScene(){}');
+ let calls=0;const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
  runInNewContext(script+';render(fixture,true)',{document,fixture,localStorage:{getItem:()=>null},setTimeout:()=>1,clearTimeout:()=>{},fetch:()=>{calls++;throw Error('unexpected API call')},window:{addEventListener:()=>{},scrollTo:()=>{}},location:{pathname:'/docker'},history:{pushState:()=>{},replaceState:()=>{}},URL,Map,Set,JSON,Number,Object});
  assert.equal(calls,0);assert.equal(elements.get('profile-environment').value,'docker');
  assert.equal(elements.get('mcp-url').disabled,true);assert.equal(elements.get('mcp-command').required,true);
@@ -56,14 +56,59 @@ test('full controls bootstrap and render setup without invoking an external acti
 });
 
 
-test('packaged SVG controller parses and dashboard routes remain bookmarkable',()=>{
- const scene=readFileSync('src/web_bridge/ui/scene.js','utf8');
- const htmlScript=html.split('<script>')[1]?.split('</script>')[0];
- assert(htmlScript,'dashboard script missing');
- assert.doesNotThrow(()=>new Script(htmlScript.replace('__SCENE_JS__',scene)));
+test('dashboard script parses and pages remain bookmarkable',()=>{
+ const script=html.split('<script>')[1]?.split('</script>')[0];
+ assert(script,'dashboard script missing');
+ assert.doesNotThrow(()=>new Script(script));
  for(const route of ['/overview','/workspace','/docker','/connections','/activity','/agent']){
    assert(html.includes('href="'+route+'"'),'missing dashboard route '+route);
  }
- assert(scene.includes('/assets/scene.svg'));
- assert(html.includes('id="bridge-scene"'));
+});
+
+function dockerFlow(prior){
+ const source=html.match(/async function startDockerProject\(\)\{[\s\S]*?\n\}\nsubmitLocal/)?.[0];
+ assert(source,'Docker setup handler exists');
+ const calls=[],fields=new Map();
+ const $=id=>{if(!fields.has(id))fields.set(id,{value:id==='root'?'C:/project':'',setAttribute(){}});return fields.get(id)};
+ const current={root:'C:/project',workspace:'project',permissions:{execution:true},profile:{environment:'docker',shell:'sh'},targets:{}};
+ const ready={configured:true,image_ready:true,container_id:'new-container',running:true,ready:true};
+ let checks=0;
+ const api=async(path,data)=>{
+  calls.push({path,data});
+  if(path==='/api/state')return current;
+  if(path==='/api/docker/status')return checks++===0?prior:checks===2?{image_ready:true}:checks===3?{image_ready:true}:ready;
+  return {};
+ };
+ const start=runInNewContext(source.replace(/\nsubmitLocal$/,'')+';startDockerProject',{
+  $,api,dockerBusy:false,dockerInput:()=>({context:'desktop-linux',image:'node:24-alpine',workdir:'/workspace',network:'bridge'}),
+  dockerProgress:()=>{},dockerStatus:()=>{},refresh:async()=>{},Error,
+ });
+ return {start,calls};
+}
+
+test('owner start recreates a positively missing container without removing any container',async()=>{
+ const {start,calls}=dockerFlow({container_id:'deleted-container',container_missing:true,image:'node:24-alpine',error:'missing'});
+ await start();
+ const actions=calls.filter(c=>c.path==='/api/docker/action').map(c=>c.data.action);
+ assert.deepEqual(actions,['detach','create']);
+ assert(calls.findIndex(c=>c.data?.action==='detach')<calls.findIndex(c=>c.path==='/api/docker/configure'));
+});
+
+test('an inspection failure does not detach or replace a possibly existing container',async()=>{
+ const {start,calls}=dockerFlow({container_id:'unknown-container',container_missing:false,error:'Docker engine is unavailable'});
+ await assert.rejects(start,/engine is unavailable/);
+ assert.equal(calls.filter(c=>c.data).length,0);
+});
+
+test('a containerless Docker mapping can be configured for the newly selected project',async()=>{
+ const {start,calls}=dockerFlow({workspace_matches:false,container_id:null,error:'another project'});
+ await start();
+ assert(calls.some(c=>c.path==='/api/docker/configure'));
+ assert.deepEqual(calls.filter(c=>c.path==='/api/docker/action').map(c=>c.data.action),['create']);
+});
+
+test('a previous project container requires an explicit forget action',async()=>{
+ const {start,calls}=dockerFlow({workspace_matches:false,container_id:'previous-project',error:'another project'});
+ await assert.rejects(start,/previous project/);
+ assert.equal(calls.filter(c=>c.data).length,0);
 });

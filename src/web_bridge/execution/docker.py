@@ -20,6 +20,10 @@ from web_bridge.workspace.files import WorkspaceError, linked
 _LABEL = "dev.web-bridge.owner"
 _MAX_OUTPUT = 256_000
 
+
+class DockerContainerMissing(WorkspaceError):
+    """A positively identified missing selection, rather than an engine failure."""
+
 # Per-exec identity and process start time constrain cancellation to owned commands.
 _IDENTITY_FUNCTION = r"""
 signal_group() {
@@ -179,6 +183,14 @@ class DockerProject:
             ) from None
         if result.returncode:
             # Docker diagnostics can expose credentials or local paths.
+            if args[:2] == ["container", "inspect"] and re.search(
+                r"(?:^|\n)(?:Error(?: response from daemon)?:\s*)?No such (?:object|container):",
+                result.stderr.strip(), re.IGNORECASE,
+            ):
+                raise DockerContainerMissing(
+                    "The selected container no longer exists in this Docker context. "
+                    "Recreate the project container locally, or detach and select an existing one."
+                )
             if args[:2] == ["image", "inspect"]:
                 raise WorkspaceError(
                     "Image is missing; explicitly pull or prepare it locally."
@@ -190,6 +202,11 @@ class DockerProject:
             if args[0] == "exec":
                 raise WorkspaceError(
                     "Docker exec failed. Check the running container, work directory, shell, and setsid support."
+                )
+            if args[:2] == ["container", "start"]:
+                raise WorkspaceError(
+                    "Docker could not start this container. Check Docker Desktop's "
+                    "container details for mount sharing, available memory, and image shell support."
                 )
             raise WorkspaceError(
                 "Docker operation failed (exit %s). Check the selected local context and container."
@@ -285,9 +302,11 @@ class DockerProject:
             if set(config) - allowed:
                 raise WorkspaceError("Unsupported Docker project setting.")
             workspace.check_root()
+            saved = self._config or {}
             docker_config = (
                 Path(
                     config.get("docker_config")
+                    or saved.get("docker_config")
                     or os.environ.get("DOCKER_CONFIG")
                     or Path.home() / ".docker"
                 )
@@ -333,7 +352,7 @@ class DockerProject:
                 raise WorkspaceError(
                     "Managed projects support bridge or none networking."
                 )
-            cpus = config.get("cpus", 2)
+            cpus = config.get("cpus", saved.get("cpus", 2))
             if (
                 isinstance(cpus, bool)
                 or not isinstance(cpus, (int, float))
@@ -342,12 +361,12 @@ class DockerProject:
                 raise WorkspaceError(
                     "Choose a CPU limit greater than zero and at most 64."
                 )
-            memory = config.get("memory", "2g")
+            memory = config.get("memory", saved.get("memory", "2g"))
             if not isinstance(memory, str) or not re.fullmatch(
                 r"[1-9][0-9]{0,6}[mMgG]", memory
             ):
                 raise WorkspaceError("Choose a memory limit such as 512m or 2g.")
-            pids = config.get("pids_limit", 256)
+            pids = config.get("pids_limit", saved.get("pids_limit", 256))
             if (
                 isinstance(pids, bool)
                 or not isinstance(pids, int)
@@ -504,7 +523,7 @@ class DockerProject:
             == owner.get("token")
         )
 
-    def status(self):
+    def status(self, workspace=None):
         """Safe remote status: never expose root, Docker config, environment or mounts."""
         with self._lock:
             result = {
@@ -515,6 +534,8 @@ class DockerProject:
                 "mode": None,
                 "owned": False,
                 "running": False,
+                "container_missing": False,
+                "workspace_matches": True,
             }
             if not self._config:
                 return result
@@ -526,9 +547,17 @@ class DockerProject:
                 network=config["network"],
                 container_id=config.get("container_id"),
                 mode=config.get("mode"),
+                cpus=config["cpus"],
+                memory=config["memory"],
+                pids_limit=config["pids_limit"],
             )
             try:
-                self._check_workspace()
+                if workspace is not None:
+                    result["workspace_matches"] = (
+                        str(workspace.root) == config["root"]
+                        and list(workspace.identity) == config["identity"]
+                    )
+                self._check_workspace(workspace)
                 self._check_engine()
                 try:
                     self._json(["image", "inspect", config["image"]])
@@ -544,14 +573,37 @@ class DockerProject:
                     )
                     result["broad_access"] = self._broad_access(info)
                     result["ready"] = result["running"]
+                    state = info.get("State", {})
+                    result["container_state"] = state.get("Status", "running" if result["running"] else "stopped")
+                    result["exit_code"] = state.get("ExitCode")
+                    result["oom_killed"] = bool(state.get("OOMKilled"))
+                    if not result["running"]:
+                        if result["oom_killed"]:
+                            result["error"] = "The container exceeded its memory limit. Free memory or choose a higher limit before recreating it."
+                        elif state.get("Error"):
+                            result["error"] = "Docker could not start the container. Check its details in Docker Desktop for mount, resource, or image errors."
+                        elif state.get("ExitCode"):
+                            result["error"] = "The container exited with code %s. Read its logs and verify the image supports sh and sleep." % state["ExitCode"]
                 return result
             except WorkspaceError as exc:
+                result["container_missing"] = isinstance(exc, DockerContainerMissing)
                 result["error"] = str(exc)
                 return result
 
     def action(self, action, workspace, **args):
         """Owner-only explicit setup; stop/remove require recorded ownership."""
         with self._lock:
+            if action == "detach":
+                # Forgetting a selection does not touch the engine or host files.
+                # It must remain possible after a workspace change or engine failure.
+                if self._jobs:
+                    raise WorkspaceError(
+                        "Finish or cancel active Docker commands before detaching."
+                    )
+                if self._config:
+                    self._config.update(container_id=None, mode=None, allow_broad_access=False)
+                    self._save()
+                return self.status(workspace)
             self._check_workspace(workspace)
             self._check_engine()
             config = self._config
@@ -623,14 +675,6 @@ class DockerProject:
                 config.update(
                     container_id=info["Id"], mode="attached", allow_broad_access=broad
                 )
-                self._save()
-            elif action == "detach":
-                # Do not detach with active executions; their cancellation identity must remain valid.
-                if self._jobs:
-                    raise WorkspaceError(
-                        "Finish or cancel active Docker commands before detaching."
-                    )
-                config.update(container_id=None, mode=None, allow_broad_access=False)
                 self._save()
             elif action in ("start", "stop", "remove", "logs"):
                 info = self._selected(workspace)

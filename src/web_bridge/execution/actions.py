@@ -60,6 +60,12 @@ class ExecutionActions:
         self.docker_state = self.docker_project.status()
         return self.docker_state
 
+    def local_docker_status(self):
+        """Owner UI diagnostics, including stale selections from another project."""
+        with self.lock:
+            self.docker_state = self.docker_project.status(self.workspace)
+            return self.docker_state
+
     def configure_docker(self, config):
         with self.lock, self.writer():
             ws = self.require("execution")
@@ -69,11 +75,12 @@ class ExecutionActions:
 
     def docker_action(self, action, **arguments):
         with self.lock, self.writer():
-            result = self.docker_project.action(
-                action, self.require("execution"), **arguments
-            )
-            self.docker_state = self.docker_project.status()
-            return result
+            workspace = self.require("execution")
+            try:
+                return self.docker_project.action(action, workspace, **arguments)
+            finally:
+                # A failed start must not leave a cached "ready" state in the UI.
+                self.docker_state = self.docker_project.status(self.workspace)
 
     def acknowledge_command_recovery(self, job_id):
         with self.lock:

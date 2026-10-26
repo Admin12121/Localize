@@ -196,6 +196,70 @@ def test_native_errors_do_not_leak_docker_paths_or_credentials(tmp_path, monkeyp
     assert 'secret-password' not in str(error.value) and '/private' not in str(error.value)
 
 
+def test_missing_selection_is_distinct_from_engine_failure_and_can_be_detached(project, monkeypatch):
+    docker, workspace, calls, _ = project
+    configure(project)
+    docker.action('create', workspace)
+    invoke = docker._invoke
+
+    def missing(args, timeout=30):
+        if args[:2] == ['container', 'inspect']:
+            return DockerProject._invoke(docker, args, timeout)
+        return invoke(args, timeout)
+
+    monkeypatch.setattr(docker, '_invoke', missing)
+    monkeypatch.setattr(subprocess, 'run', lambda *a, **kw:
+        subprocess.CompletedProcess(a[0], 1, '', 'Error: No such object: ' + 'a' * 64))
+    result = docker.status()
+    assert result.get('container_missing') is True
+    assert not result['ready'] and 'Recreate' in result['error']
+    calls.clear()
+    assert docker.action('detach', workspace)['container_id'] is None
+    assert not any(c[:2] in (['container', 'rm'], ['container', 'stop']) for c in calls)
+
+
+def test_inspection_access_failure_never_claims_the_container_is_missing(project, monkeypatch):
+    docker, workspace, _, _ = project
+    configure(project)
+    docker.action('create', workspace)
+    invoke = docker._invoke
+
+    def unavailable(args, timeout=30):
+        if args[:2] == ['container', 'inspect']:
+            return DockerProject._invoke(docker, args, timeout)
+        return invoke(args, timeout)
+
+    monkeypatch.setattr(docker, '_invoke', unavailable)
+    monkeypatch.setattr(subprocess, 'run', lambda *a, **kw:
+        subprocess.CompletedProcess(a[0], 1, '', 'permission denied: /private/docker/config.json token=secret'))
+    result = docker.status()
+    assert not result.get('container_missing')
+    assert not result['ready']
+    assert 'secret' not in result['error'] and '/private' not in result['error']
+
+
+def test_stopped_container_reports_exit_and_memory_recovery_without_raw_engine_error(project, monkeypatch):
+    docker, workspace, _, state = project
+    configure(project)
+    docker.action('create', workspace)
+    invoke = docker._invoke
+
+    def stopped(args, timeout=30):
+        value = invoke(args, timeout)
+        if args[:2] == ['container', 'inspect']:
+            info = json.loads(value)
+            info[0]['State'] = {'Running': False, 'Status': 'exited', 'ExitCode': 137,
+                                'OOMKilled': True, 'Error': 'secret engine details'}
+            return json.dumps(info)
+        return value
+
+    monkeypatch.setattr(docker, '_invoke', stopped)
+    result = docker.status()
+    assert result.get('exit_code') == 137
+    assert result.get('oom_killed') is True
+    assert 'memory' in result['error'].lower() and 'secret' not in result['error']
+
+
 @pytest.mark.skipif(os.environ.get('WEB_BRIDGE_DOCKER_TEST') != '1', reason='Explicit real local Docker fixture')
 def test_real_docker_persistent_mount_and_attached_command_cancellation(tmp_path):
     root = tmp_path / 'docker-roundtrip'; root.mkdir()
@@ -280,3 +344,75 @@ def test_restart_restores_workspace_reference_for_subdirectories(project):
     restarted.validate_workspace(workspace)
     command = restarted.build_command('after-restart', ['pwd'], 'nested')
     assert '/workspace/nested' in command
+
+
+def test_local_status_can_reconfigure_containerless_mapping_for_new_project(project, tmp_path):
+    docker, workspace, _, _ = project
+    configure(project)
+    other = tmp_path / 'other-project'
+    other.mkdir()
+    selected = Workspace(other)
+    result = docker.status(selected)
+    assert result['workspace_matches'] is False and result['container_id'] is None
+    assert not result['ready']
+    assert docker.configure({'context': 'desktop-linux'}, selected)['workspace_matches']
+
+
+def test_forget_selection_preserves_old_container_after_workspace_switch(project, tmp_path):
+    docker, workspace, calls, _ = project
+    configure(project)
+    docker.action('create', workspace)
+    other = tmp_path / 'other-project'
+    other.mkdir()
+    selected = Workspace(other)
+    calls.clear()
+    assert docker.action('detach', selected)['container_id'] is None
+    assert not any(args[0] == 'container' for args in calls)
+    assert docker.configure({'context': 'desktop-linux'}, selected)['workspace_matches']
+
+
+def test_recreation_preserves_locally_saved_resource_limits_and_docker_configuration(project, tmp_path):
+    docker, workspace, _, _ = project
+    configure(project, cpus=1, memory='512m', pids_limit=64, docker_config=str(tmp_path/'docker-settings'))
+    docker.action('create', workspace)
+    docker.action('detach', workspace)
+    docker.configure({'context':'desktop-linux', 'image':'node:24-alpine',
+                      'workdir':'/workspace', 'network':'bridge'}, workspace)
+    assert docker._config['cpus'] == 1
+    assert docker._config['memory'] == '512m'
+    assert docker._config['pids_limit'] == 64
+    assert docker._config['docker_config'] == str(tmp_path/'docker-settings')
+
+
+@pytest.mark.skipif(os.environ.get('WEB_BRIDGE_DOCKER_TEST') != '1', reason='Explicit real local Docker fixture')
+def test_real_docker_missing_container_recovery_keeps_project_files_and_limits(tmp_path):
+    root = tmp_path/'recovery-project'
+    root.mkdir()
+    (root/'proof.txt').write_text('before recovery', encoding='utf-8')
+    workspace = Workspace(root)
+    docker = DockerProject(tmp_path/'recovery-runtime')
+    created = []
+    try:
+        docker.configure({'image':'node:24-alpine','network':'none',
+                          'cpus':1,'memory':'512m','pids_limit':64}, workspace)
+        created.append(docker.action('create', workspace)['container_id'])
+        docker._invoke(['container','rm','--force',created[-1]])
+        missing = docker.status()
+        assert missing['container_missing'] and not missing['ready']
+        docker.action('detach', workspace)
+        docker.configure({'image':'node:24-alpine','network':'none'}, workspace)
+        ready = docker.action('create', workspace)
+        created.append(ready['container_id'])
+        assert ready['ready'] and ready['cpus'] == 1 and ready['memory'] == '512m'
+        assert ready['pids_limit'] == 64
+        command = docker.build_command('after-recovery', ['node','-e',
+            "const fs=require('fs');if(fs.readFileSync('proof.txt','utf8')!=='before recovery')process.exit(3);fs.writeFileSync('proof.txt','after recovery');console.log(process.cwd())"], '')
+        result = subprocess.run(command,capture_output=True,text=True,timeout=20)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == '/workspace'
+        assert (root/'proof.txt').read_text() == 'after recovery'
+        docker.finish('after-recovery')
+    finally:
+        for container in created:
+            subprocess.run(docker._command(['container','rm','--force',container]),
+                           capture_output=True,timeout=15)

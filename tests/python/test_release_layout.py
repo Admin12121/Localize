@@ -39,7 +39,7 @@ def test_extracted_companion_runs_and_reads_bundled_skill_and_ui(tmp_path):
     extracted=tmp_path/'web-bridge-companion'
     about=subprocess.run([sys.executable,'-B',str(extracted/'scripts/run.py'),'--about'],cwd=tmp_path,capture_output=True,text=True,timeout=15)
     assert about.returncode==0,about.stderr
-    assert json.loads(about.stdout)['version']=='3.2.3'
+    assert json.loads(about.stdout)['version']=='3.2.4'
     code='''from pathlib import Path
 from web_bridge.app import Companion
 from web_bridge.resources import UI_ROOT
@@ -92,5 +92,5 @@ def test_portable_python_bundle_reports_version_without_network_or_services(tmp_
         capture_output=True, text=True, timeout=20,
     )
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)['version'] == '3.2.3'
+    assert json.loads(result.stdout)['version'] == '3.2.4'
     assert list(tmp_path.iterdir()) == []

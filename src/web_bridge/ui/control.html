@@ -1,43 +1,42 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="author" content="admin12121"><meta name="creator" content="admin12121"><meta name="copyright" content="2026 admin12121 · MIT"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local controls · Admin12211's Web-Bridge instance</title><style>__STYLE__</style></head><body><main class="local-main">
-<header class="topbar"><div><p class="eyebrow">THIS COMPUTER · BY ADMIN12121</p><h1>Admin12211's Web-Bridge instance</h1></div><div class="top-actions"><span class="tag" id="live-state">Local controls</span><button id="theme" aria-label="Switch color theme">◐</button></div></header>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="author" content="admin12121"><meta name="creator" content="admin12121"><meta name="copyright" content="2026 admin12121 · MIT"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Localize · Local controls</title><style>__STYLE__</style></head><body><main class="local-main">
+<header class="topbar"><a class="local-brand" href="/overview" aria-label="Localize overview"><span class="local-logo" aria-hidden="true">L</span><span><strong>Localize</strong><small id="status">Local controls · This computer</small></span></a><div class="top-actions"><span class="tag" id="live-state">Locked</span><button id="pause" type="button" hidden>Pause bridge</button><button id="theme" class="theme-toggle" aria-label="Switch color theme" title="Switch color theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/></svg></button></div></header>
 <section id="login" class="frame"><div class="frame-header"><h3>Unlock local controls</h3></div><form id="login-form" class="panel"><label for="code">Local control code</label><input id="code" type="password" autocomplete="off" required><p>Enter the local code printed in your companion terminal. Keep it on this computer.</p><button class="primary">Unlock controls</button></form></section>
 <div id="content" hidden>
-<div class="split page-heading"><div><h2>Localize</h2><p id="status">Reading companion state…</p></div><button id="pause" class="danger" type="button">Pause bridge</button></div>
 <div class="dashboard-layout">
 <nav class="dashboard-nav" aria-label="Localize sections">
- <a href="/overview" data-view="overview"><span class="nav-mark">◉</span> Overview</a>
- <a href="/workspace" data-view="project"><span class="nav-mark">▤</span> Workspace</a>
- <a href="/docker" data-view="docker"><span class="nav-mark">▣</span> Docker</a>
- <a href="/connections" data-view="integrations"><span class="nav-mark">◇</span> Connections</a>
- <a href="/activity" data-view="activity"><span class="nav-mark">≡</span> Activity <span id="activity-count" class="nav-count"></span></a>
- <a href="/agent" data-view="agent"><span class="nav-mark">✧</span> Local agent</a>
- <p class="nav-help">Configuration stays on this computer. ChatGPT can only use the access you allow.</p>
+ <a href="/overview" data-view="overview"><svg class="nav-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"/></svg> Overview</a>
+ <a href="/workspace" data-view="project"><svg class="nav-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z"/></svg> Workspace</a>
+ <a href="/docker" data-view="docker"><svg class="nav-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-5 9 5v9l-9 5-9-5Z M3 8l9 5 9-5 M12 13v9"/></svg> Docker</a>
+ <a href="/connections" data-view="integrations"><svg class="nav-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v5 M16 3v5 M6 8h12v3a6 6 0 0 1-6 6v4 M9 21h6"/></svg> Connections</a>
+ <a href="/activity" data-view="activity"><svg class="nav-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg> Activity <span id="activity-count" class="nav-count"></span></a>
+ <a href="/agent" data-view="agent"><svg class="nav-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v13H5Z M9 11v2 M15 11v2 M9 17h6 M12 3v4"/></svg> Local agent</a>
+ <p class="nav-help"><strong>Controlled on this computer</strong>ChatGPT uses only the access you allow here.</p>
 </nav>
 <div class="dashboard-pages">
 <section class="dashboard-page" id="page-overview" aria-labelledby="heading-overview">
- <div class="view-heading"><p class="eyebrow">CONTROL CENTER</p><h2 id="heading-overview">Your environment at a glance</h2><p>Set up once, then focus on working in ChatGPT.</p></div>
+ <div class="view-heading"><h2 id="heading-overview">Overview</h2><p>Your project, execution environment, and connected tools.</p></div>
  <div class="summary-grid">
   <div class="summary-cell"><span>Project</span><strong id="overview-project">Not selected</strong><small id="overview-access">Select a workspace</small></div>
   <div class="summary-cell"><span>Execution</span><strong id="overview-command">Not available</strong><small id="overview-shell">Configure in Workspace</small></div>
   <div class="summary-cell"><span>Docker</span><strong id="overview-docker">Not configured</strong><small id="overview-image">Optional</small></div>
   <div class="summary-cell"><span>Connections</span><strong id="overview-integrations">No adapters</strong><small id="overview-apps">Locally enabled only</small></div>
  </div>
- <section class="frame scene-frame" aria-labelledby="bridge-flow-heading"><div class="frame-header">
-  <div class="split"><div><h3 id="bridge-flow-heading">Live bridge operations</h3><p>The original SVG scene, with counts from this companion—not sample findings.</p></div><span class="tag">Live local state</span></div>
- </div><div class="panel scene-panel"><div id="bridge-scene" class="bridge-scene" aria-label="Live Localize source and execution flow"><p class="scene-loading">Loading source visualization…</p></div></div>
- <div id="scene-caption" class="scene-caption" aria-live="polite">Waiting for local operational metrics.</div>
- </section>
- <section class="frame"><div class="frame-header"><h3>Get started</h3><p>Choose what you want to do. Advanced settings stay out of the way.</p></div><div class="panel">
-  <div class="setup-links"><button type="button" data-open-view="project"><b>01</b><span><strong>Choose a project</strong><small>Folder, permissions, and how commands run</small></span><span>→</span></button>
-   <button type="button" data-open-view="docker"><b>02</b><span><strong>Start Docker (optional)</strong><small>One setup action when you want a live project container</small></span><span>→</span></button>
-   <button type="button" data-open-view="integrations"><b>03</b><span><strong>Connect applications</strong><small>Trusted skills, MCP adapters, and authorized websites</small></span><span>→</span></button></div>
+ <section class="frame readiness-frame"><div class="frame-header"><h3 id="overview-health">Choose a project to get started</h3><p id="overview-next">Select a folder and the access ChatGPT needs.</p></div><div class="panel readiness-panel">
+  <div class="status-row"><strong>Bridge</strong><span id="overview-bridge-state">Waiting for local state</span></div>
+  <div class="status-row"><strong>Approvals</strong><span id="overview-pending">No pending actions</span></div>
+  <div class="status-row"><strong>Commands</strong><span id="overview-running">No commands running</span></div>
+ </div></section>
+ <section class="frame"><div class="frame-header"><h3>Workspace setup</h3><p>Open a section to change its settings.</p></div><div class="panel">
+  <div class="setup-links"><button type="button" data-open-view="project"><span><strong>Choose a project</strong><small>Folder, permissions, and how commands run</small></span><span>→</span></button>
+   <button type="button" data-open-view="docker"><span><strong>Set up Docker</strong><small>Run commands against your project inside a container</small></span><span>→</span></button>
+   <button type="button" data-open-view="integrations"><span><strong>Connect applications</strong><small>Trusted skills, MCP adapters, and authorized websites</small></span><span>→</span></button></div>
  </div></section>
  <section class="frame"><div class="frame-header"><h3>Connect to ChatGPT</h3></div><div class="panel"><p>Open your private Site → Overview and save this companion's endpoint and connection key. Test the connection there. Never paste the key into chat.</p></div></section>
  <div class="notice">This dashboard controls local permissions. Changing them revokes earlier approvals. Running an application is not the same as verifying its desktop window opened.</div>
 </section>
 
 <section class="dashboard-page" id="page-project" hidden aria-labelledby="heading-project">
- <div class="view-heading"><p class="eyebrow">WORKSPACE</p><h2 id="heading-project">Project and access</h2><p>Choose what ChatGPT can work on. Command environments are selected here; Docker setup lives in the Docker tab.</p></div>
+ <div class="view-heading"><h2 id="heading-project">Project and access</h2><p>Choose what ChatGPT can work on. Command environments are selected here; Docker setup lives in the Docker tab.</p></div>
  <section class="frame"><div class="frame-header"><h3>Project</h3></div><form id="permissions" class="panel">
   <label for="root">Project folder</label><div class="actions top-inline"><input id="root" placeholder="Select a local project folder"><button id="browse" type="button">Browse…</button></div>
   <label for="alias">Workspace name</label><input id="alias" value="workspace" maxlength="60">
@@ -50,6 +49,7 @@
     <option value="host">This computer — individual approval</option>
   </select>
   <p id="mode-help" class="small">Snapshot mode runs against a filtered copy. Changes require synchronization.</p>
+  <div id="snapshot-settings" hidden><label for="image">Snapshot image</label><select id="image"><option>python:3.12-alpine</option><option>node:24-alpine</option><option>alpine:3.21</option></select><p class="small">Commands use a filtered copy. File changes return for review before synchronization.</p></div>
   <label for="profile-shell">Shell</label><select id="profile-shell"><option value="powershell">Windows PowerShell</option><option value="pwsh">PowerShell 7</option><option value="cmd">Command Prompt</option><option value="sh">sh · Linux / Docker</option><option value="bash">bash · Linux / Docker</option></select>
   <details class="settings-disclosure"><summary>Advanced permissions and limits</summary>
     <div class="grid"><div><label for="default-timeout">Default timeout · seconds</label><input id="default-timeout" type="number" min="1" max="3600" value="600" required></div><div><label for="max-timeout">Maximum timeout · seconds</label><input id="max-timeout" type="number" min="1" max="3600" value="3600" required></div></div>
@@ -68,37 +68,35 @@
 </section>
 
 <section class="dashboard-page" id="page-docker" hidden aria-labelledby="heading-docker">
- <div class="view-heading"><p class="eyebrow">EXECUTION</p><h2 id="heading-docker">Docker</h2><p>One setup, one start. Choose a project image and keep full control over containers.</p></div>
+ <div class="view-heading"><h2 id="heading-docker">Docker</h2><p>Run commands in a container with your project folder mounted directly.</p></div>
  <section class="frame"><div class="frame-header"><h3>Live project container</h3><p>Mounts your selected project directly at /workspace (or your custom path). File changes are immediate.</p></div><div class="panel">
-  <div class="docker-state" id="docker-status" role="status">Not configured</div>
+  <div class="docker-state" id="docker-status" role="status">Choose an image to set up Docker.</div>
+  <dl class="docker-facts"><div><dt>Context</dt><dd id="docker-fact-context">Current local context</dd></div><div><dt>Container</dt><dd id="docker-fact-container">None selected</dd></div><div><dt>Project mount</dt><dd id="docker-fact-mount">/workspace</dd></div></dl>
   <form id="docker-form">
    <label for="docker-image">Project image</label><input id="docker-image" list="docker-images" value="node:24-alpine" required autocomplete="off"><datalist id="docker-images"><option value="node:24-alpine"><option value="python:3.12-alpine"><option value="alpine:3.21"></datalist>
    <div class="grid"><div><label for="docker-network">Internet access</label><select id="docker-network"><option value="none">Off · isolated</option><option value="bridge">On · outbound access</option></select></div>
    <div><label for="docker-workdir">Container project path</label><input id="docker-workdir" value="/workspace" required></div></div>
    <details class="settings-disclosure"><summary>Advanced Docker options</summary>
      <label for="docker-context">Local Docker context</label><input id="docker-context" placeholder="Automatically use current local context" autocomplete="off">
+     <div class="grid"><div><label for="docker-cpus">CPU limit</label><input id="docker-cpus" type="number" min="0" max="64" step="any" value="2" required></div><div><label for="docker-memory">Memory limit</label><input id="docker-memory" value="2g" pattern="[1-9][0-9]{0,6}[mMgG]" required placeholder="512m or 2g"></div></div>
+     <label for="docker-pids">Process limit</label><input id="docker-pids" type="number" min="16" max="65536" value="256" required>
      <p class="small">Only locally selected Docker engines. Existing containers are not automatically replaced if settings change.</p>
    </details>
-   <div class="actions"><button type="submit" class="primary" id="docker-start">Start Docker project</button></div>
-   <p class="small" id="docker-progress" role="status" aria-live="polite">Saves the workspace profile, prepares the image if missing, starts the container, and checks readiness. It never removes a selected container.</p>
+   <ol class="docker-steps" id="docker-steps" aria-label="Docker setup progress"><li id="docker-step-1">Configure</li><li id="docker-step-2">Prepare image</li><li id="docker-step-3">Start container</li><li id="docker-step-4">Verify</li></ol>
+   <div class="actions"><button type="submit" class="primary" id="docker-start">Start Docker project</button><button type="button" id="docker-refresh">Refresh status</button></div>
+   <p class="small" id="docker-progress" role="status" aria-live="polite">The first start may download your image. Existing containers are kept unless you explicitly remove them.</p>
   </form>
- </div></section>
- <section class="frame"><div class="frame-header"><h3>Isolated snapshot</h3><p>Use this mode for copied, filtered files rather than a live mount.</p></div><div class="panel">
-  <p>Choose <strong>Isolated snapshot</strong> under Workspace → Execution environment. It does not use your live project container.</p>
-  <label for="image">Snapshot image</label><select id="image"><option>python:3.12-alpine</option><option>node:24-alpine</option><option>alpine:3.21</option></select>
-  <p class="small">Snapshot image is a separate setting from the live project image. Save Workspace after changing this option.</p>
-  <button type="button" data-open-view="project">Open workspace settings</button>
  </div></section>
  <section class="frame"><div class="frame-header"><h3>Container management</h3><p>Optional actions for existing containers.</p></div><div class="panel">
   <details class="settings-disclosure"><summary>Attach an existing container</summary><label for="docker-container">Container name or ID</label><input id="docker-container" autocomplete="off" placeholder="Existing project container"><p class="small">Must already mount your project at the chosen path.</p><label class="check"><input id="docker-broad" type="checkbox"><span>Allow broader access for this container after inspecting it</span></label><button type="button" data-docker-action="attach">Attach selected container</button></details>
   <details class="settings-disclosure"><summary>Advanced actions and logs</summary><p class="small">Stopping/removing is restricted to bridge-owned containers. Your host project remains untouched.</p><div class="actions">
-    <button type="button" data-docker-action="start">Start existing</button><button type="button" data-docker-action="stop">Stop</button><button type="button" class="danger" data-docker-action="remove">Remove managed container</button><button type="button" data-docker-action="logs">Read logs</button><button type="button" data-docker-action="detach">Detach (keep container)</button>
+    <button type="button" data-docker-action="start">Start existing</button><button type="button" data-docker-action="stop">Stop</button><button type="button" class="danger" data-docker-action="remove">Remove container</button><button type="button" data-docker-action="logs">Read logs</button><button type="button" data-docker-action="detach">Forget selection (keep container)</button>
   </div><pre id="docker-result" hidden></pre></details>
  </div></section>
 </section>
 
 <section class="dashboard-page" id="page-integrations" hidden aria-labelledby="heading-integrations">
- <div class="view-heading"><p class="eyebrow">CONNECTIONS</p><h2 id="heading-integrations">Websites and applications</h2><p>Only explicitly selected websites, local skills and MCP adapters are available.</p></div>
+ <div class="view-heading"><h2 id="heading-integrations">Websites and applications</h2><p>Only explicitly selected websites, local skills and MCP adapters are available.</p></div>
  <section class="frame" id="ctf-targets"><div class="frame-header"><h3>Authorized websites</h3></div><div class="panel">
   <form id="target-form"><div class="grid"><div><label for="target-name">Target name</label><input id="target-name" value="challenge" maxlength="40" required></div><div><label for="target-url">Website URL</label><input id="target-url" type="url" required placeholder="https://challenge.example:8443"></div></div><p class="small">Requests are restricted to the selected scheme, host, and port.</p><div class="actions"><button class="primary" type="submit">Add website</button></div></form>
   <ul class="clean" id="target-list"></ul><details class="settings-disclosure"><summary>Website access options</summary>
@@ -124,7 +122,7 @@
 </section>
 
 <section class="dashboard-page" id="page-activity" hidden aria-labelledby="heading-activity">
- <div class="view-heading"><p class="eyebrow">MONITOR</p><h2 id="heading-activity">Approvals and activity</h2><p>Review actions, inspect actual command results, and resume saved tasks.</p></div>
+ <div class="view-heading"><h2 id="heading-activity">Approvals and activity</h2><p>Review actions, inspect actual command results, and resume saved tasks.</p></div>
  <section class="frame"><div class="frame-header"><h3>Pending approvals</h3></div><div class="panel" id="approvals"><div class="empty">No pending operations</div></div></section>
  <section class="frame"><div class="frame-header"><div class="split"><h3>Command activity</h3><span id="job-count" class="small muted">0 commands</span></div></div><div class="panel activity-list" id="jobs" tabindex="0" aria-label="Command history"><div class="empty">No commands yet</div></div><button id="more-jobs" class="load-more" hidden>Load more</button></section>
  <section class="frame"><div class="frame-header"><h3>Saved work</h3><p>Track unfinished tasks and verified outcomes.</p></div><div class="panel"><form id="task-form"><label for="task-intent">Task objective</label><textarea id="task-intent" required maxlength="8000" placeholder="Describe what should be completed and verified"></textarea><details class="settings-disclosure"><summary>Acceptance checks</summary><label for="task-checks">Checks · JSON array</label><textarea id="task-checks" spellcheck="false" placeholder='[{"kind":"file","path":"result.txt","contains":"expected text"}]'></textarea></details><div class="actions"><button class="primary" type="submit">Save task</button></div></form>
@@ -132,7 +130,7 @@
 </section>
 
 <section class="dashboard-page" id="page-agent" hidden aria-labelledby="heading-agent">
- <div class="view-heading"><p class="eyebrow">OPTIONAL</p><h2 id="heading-agent">Local agent</h2><p>For explicit autonomous saved tasks using your own OpenAI API account.</p></div>
+ <div class="view-heading"><h2 id="heading-agent">Local agent</h2><p>For explicit autonomous saved tasks using your own OpenAI API account.</p></div>
  <section class="frame"><div class="frame-header"><h3>Agent configuration</h3></div><div class="panel"><p id="runner-status" role="status">Local agent is disabled.</p>
  <form id="runner-form"><label class="check"><input id="runner-enabled" type="checkbox"><span>Enable local agent for saved tasks</span></label>
   <label for="runner-model">API model</label><input id="runner-model" autocomplete="off" placeholder="Available API model">
@@ -144,7 +142,7 @@
  </form><p id="runner-budget" class="small">API use is billed separately. Saving does not make an API call.</p><ul id="runner-runs" class="clean"></ul>
  </div></section>
 </section>
-</div></div></div><footer class="small muted">Created by admin12121 · MIT · 3.2.3</footer><div id="feedback" class="feedback" role="status" aria-live="polite"></div></main>
+</div></div></div><footer class="small muted">Created by <a href="https://admin12121.com" target="_blank" rel="noopener noreferrer">admin12121</a> · MIT · 3.2.4</footer><div id="feedback" class="feedback" role="status" aria-live="polite"></div></main>
 <script>
 const $=id=>document.getElementById(id);let csrf='',state=null,targets={},ctfSaving=false;const flags=['read','write','execution','host','network','auto_container','auto_write','ctf','integrations','auto_operations','recursive_delete'];
 function say(text){$('feedback').textContent=text;clearTimeout(window.noticeTimer);window.noticeTimer=setTimeout(()=>$('feedback').textContent='',10000)}
@@ -152,7 +150,6 @@ function theme(){document.documentElement.dataset.theme=localStorage.getItem('we
 async function api(path,data){const r=await fetch(path,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Web-Bridge-CSRF':csrf},...(data===undefined?{}:{body:JSON.stringify(data)})});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
 function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
 function action(parent,label,path,data){const b=node('button',label);b.type='button';b.onclick=async()=>{b.disabled=true;try{await api(path,data);await refresh(false);say(label==='Accept command'?'Command approved and queued; check its job status for execution results.':label+' completed')}catch(e){say(e.message)}finally{b.disabled=false}};parent.append(b)}
-__SCENE_JS__
 function render(s,fill){state=s;$('status').textContent=(s.paused?'Paused':'Ready')+' · '+s.platform+' · '+(s.workspace||'No project selected');$('pause').textContent=s.paused?'Resume bridge':'Pause bridge';if(fill){$('root').value=s.root;$('alias').value=s.workspace||'workspace';flags.forEach(k=>$(k).checked=s.permissions[k]);$('image').value=s.permissions.image;targets={...s.targets};renderTargets();$('allow_private').checked=s.allow_private||false;fillSetup(s)}
  renderApprovals(s);renderJobs(s);renderSetup(s);
  $('overview-project').textContent=s.workspace||'Not selected';
@@ -164,7 +161,16 @@ function render(s,fill){state=s;$('status').textContent=(s.paused?'Paused':'Read
  $('overview-integrations').textContent=(s.integrations?.servers?.length||0)+' MCP adapters';
  $('overview-apps').textContent=(s.integrations?.skills?.length||0)+' selected skills';
  $('activity-count').textContent=(s.jobs.filter(j=>j.state==='pending').length+s.edits.length)||'';
- updateScene(s);
+ $('pause').hidden=false;
+ const pending=s.jobs.filter(j=>j.state==='pending').length+s.edits.length;
+ const running=s.jobs.filter(j=>['running','approved'].includes(j.state)).length;
+ const blocked=s.paused||!s.workspace||(s.profile.environment==='docker'&&!s.docker?.ready);
+ $('overview-health').textContent=s.paused?'Bridge paused':!s.workspace?'Choose a project to get started':blocked?'Docker needs attention':'Project connected';
+ $('overview-next').textContent=s.paused?'Resume when you are ready to allow new work.':!s.workspace?'Select a folder in Workspace and choose the access ChatGPT needs.':blocked?'Open Docker to start or recover your selected container.':'Review access in Workspace, then use your bridge in ChatGPT.';
+ $('overview-bridge-state').textContent=s.paused?'Paused':'Connected';
+ $('overview-pending').textContent=pending?pending+' awaiting review':'No pending actions';
+ $('overview-running').textContent=running?running+' in progress':'No commands running';
+ modeHelp();
 }
 const approvalRows=new Map(),jobRows=new Map();let visibleJobs=10,etag='',refreshing=null;
 function reconcile(parent,map,items,create,update){
@@ -228,10 +234,10 @@ async function refresh(fill=false){
  refreshing=(async()=>{const r=await fetch('/api/state',{headers:!fill&&etag?{'If-None-Match':etag}:{}});
  if(r.status===304)return;
  const d=await r.json();if(!r.ok)throw Error(d.error||'Connection failed');etag=r.headers.get('ETag')||'';render(d,fill);
- })();try{await refreshing;$('live-state').textContent='Live'}finally{refreshing=null}
+ })();try{await refreshing;$('live-state').textContent=state?.paused?'Paused':'Connected'}finally{refreshing=null}
 }
 let pollTimer;
-async function poll(){clearTimeout(pollTimer);if(csrf&&!document.hidden){try{await refresh(false)}catch(e){$('live-state').textContent='Reconnecting…';if(e.message.includes('Sign in')){csrf='';$('login').hidden=false;$('content').hidden=true}}}pollTimer=setTimeout(poll,750)}
+async function poll(){clearTimeout(pollTimer);if(csrf&&!document.hidden){try{await refresh(false)}catch(e){$('live-state').textContent='Reconnecting…';if(e.message.includes('Sign in')){csrf='';$('login').hidden=false;$('content').hidden=true;$('pause').hidden=true}}}pollTimer=setTimeout(poll,750)}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});
 $('login-form').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/login',{code:$('code').value});csrf=d.csrf;$('code').value='';$('login').hidden=true;$('content').hidden=false;await refresh(true)}catch(e){say(e.message)}};
 $('browse').onclick=async()=>{try{say('Choose a folder in the local picker…');const d=await api('/api/choose-folder',{});if(d.path)$('root').value=d.path}catch(e){say(e.message)}};
@@ -255,13 +261,24 @@ function fillSetup(s){
  const p=s.profile||{environment:'container',shell:'sh',default_timeout:600,max_timeout:3600};
  $('profile-environment').value=p.environment;$('profile-shell').value=p.shell;$('default-timeout').value=p.default_timeout;$('max-timeout').value=p.max_timeout;
  const d=s.docker||{};if(d.context)$('docker-context').value=d.context;if(d.image)$('docker-image').value=d.image;if(d.workdir)$('docker-workdir').value=d.workdir;if(d.network)$('docker-network').value=d.network;
+ for(const [id,key] of [['docker-cpus','cpus'],['docker-memory','memory'],['docker-pids','pids_limit']])if(d[key]!==undefined)$(id).value=d[key];
  const r=s.runner?.config||{};$('runner-enabled').checked=!!r.enabled;for(const [id,key] of [['runner-model','model'],['runner-key-env','api_key_env'],['runner-steps','max_steps'],['runner-seconds','max_seconds'],['runner-tokens','max_tokens']])if(r[key]!==undefined)$(id).value=r[key];
 }
 function dockerStatus(d){
- let text=!d.configured?'Not configured · choose an image and Start Docker.':d.ready?'Ready · '+(d.owned?'managed container':'attached container'):d.container_id?'Selected container is stopped or unavailable.':d.image_ready?'Image is ready. Create a project container or attach an existing one.':'Image is not ready. Prepare the selected image.';
- const details=[d.context,d.image,d.workdir,d.container_id].filter(Boolean);if(details.length)text+='\n'+details.join(' · ');if(d.error||d.image_error)text+='\n'+(d.error||d.image_error);
- $('docker-status').textContent=text;for(const button of document.querySelectorAll('[data-docker-action="stop"],[data-docker-action="remove"]'))button.disabled=!d.owned;
+ const title=d.workspace_matches===false?'Project selection changed':d.container_missing?'Container no longer exists':d.error?'Docker needs attention':d.ready?'Container running':d.container_id?'Container stopped':d.configured?'Ready to create a container':'Set up a project container';
+ const detail=d.workspace_matches===false?(d.container_id?'A container belongs to your previous project. Use Container management → Forget selection to keep it, then start Docker for this project.':'Start Docker to configure the newly selected project.'):d.error||d.image_error||(d.ready?'Project commands can run in this container.':d.container_id?'Start the selected container to continue.':'Choose an image below. Docker must be installed and running.');
+ const box=$('docker-status');box.replaceChildren(node('strong',title),node('p',detail));box.dataset.state=d.ready?'ready':d.error?'error':'idle';
+ $('docker-fact-context').textContent=d.context||'Current local context';
+ $('docker-fact-container').textContent=d.container_id?d.container_id.slice(0,12)+(d.container_missing?' · missing':d.running?' · running':' · stopped'):'None selected';
+ $('docker-fact-container').title=d.container_id||'';
+ $('docker-fact-mount').textContent=d.workdir||'/workspace';
+ if(!dockerBusy)$('docker-start').textContent=d.container_missing?'Recreate missing container':d.ready?'Verify Docker project':d.container_id?'Start Docker project':'Start Docker project';
+ for(const button of document.querySelectorAll('[data-docker-action]')){
+  const action=button.dataset.dockerAction;
+  button.disabled=dockerBusy||(['stop','remove'].includes(action)?!d.owned:['start','logs'].includes(action)?!d.container_id||d.container_missing:action==='detach'?!d.container_id:false);
+ }
 }
+let dockerBusy=false;
 let integrationSignature='',taskSignature='',runSignature='';
 function renderSetup(s){
  dockerStatus(s.docker||{});const selected=s.integrations||{skills:[],servers:[]};
@@ -278,22 +295,34 @@ function renderTasks(tasks,runner,paused){
  const list=$('task-list');list.replaceChildren();for(const task of tasks){const row=node('li',undefined,'target');row.append(node('strong',task.intent),node('div',task.status+' · '+task.task_id,'small muted'));if(task.handoff)row.append(node('p',typeof task.handoff==='string'?task.handoff.slice(0,500):JSON.stringify(task.handoff).slice(0,500),'small'));const buttons=node('div',undefined,'actions'),view=node('button','View saved task');view.type='button';view.onclick=()=>runLocal(view,async()=>{const result=await api('/api/task?id='+encodeURIComponent(task.task_id));$('task-detail-text').textContent=JSON.stringify(result,null,2);$('task-detail').hidden=false;$('task-detail').open=true},'Saved task loaded.');buttons.append(view);if(!['completed','cancelled'].includes(task.status)){const resume=node('button','Use in ChatGPT');resume.type='button';resume.disabled=paused;resume.onclick=()=>runLocal(resume,()=>api('/api/task/resume',{task_id:task.task_id}),'Task is bound to the current project. Ask ChatGPT to continue this saved task.');buttons.append(resume);const complete=node('button','Confirm reviewed complete');complete.type='button';complete.disabled=paused||(runner.running||[]).includes(task.task_id);complete.onclick=()=>runLocal(complete,()=>api('/api/task/complete',{task_id:task.task_id}),'Your local review was saved as completion evidence.');buttons.append(complete);const start=node('button','Resume with local agent');start.type='button';start.disabled=!canRun||(runner.running||[]).length>0;start.onclick=()=>runLocal(start,()=>api('/api/runner/start',{task_id:task.task_id}),'Local agent started. Check task progress and pending approvals.');buttons.append(start)}row.append(buttons);list.append(row)}if(!list.children.length)list.append(node('li','No saved tasks yet.','empty'));
 }
 async function runLocal(button,operation,message){
- if(button)button.disabled=true;try{await operation();await refresh(false);say(message)}catch(e){say(e.message)}finally{if(button){button.disabled=false;if(['stop','remove'].includes(button.dataset.dockerAction))button.disabled=!state?.docker?.owned}}
+ if(button)button.disabled=true;try{await operation();await refresh(false);say(message)}catch(e){say(e.message)}finally{if(button){button.disabled=false;if(['stop','remove'].includes(button.dataset.dockerAction))button.disabled=!state?.docker?.owned}if(state)dockerStatus(state.docker||{})}
 }
 function submitLocal(id,operation,message){$(id).onsubmit=e=>{e.preventDefault();return runLocal(e.submitter||$(id).querySelector('button[type="submit"],button:not([type])'),operation,message)}}
 $('profile-environment').onchange=()=>{if($('profile-environment').value!=='host'&&!['sh','bash'].includes($('profile-shell').value))$('profile-shell').value='sh';else if($('profile-environment').value==='host'&&state?.platform?.toLowerCase().includes('windows')&&['sh','bash'].includes($('profile-shell').value))$('profile-shell').value='powershell'};
-let dockerBusy=false;
-function dockerInput(){return {context:$('docker-context').value.trim(),image:$('docker-image').value.trim(),workdir:$('docker-workdir').value.trim(),network:$('docker-network').value}}
-function dockerProgress(text){$('docker-progress').textContent=text;$('docker-progress').dataset.phase=text}
-submitLocal('docker-form',async()=>{
+function dockerInput(){return {context:$('docker-context').value.trim(),image:$('docker-image').value.trim(),workdir:$('docker-workdir').value.trim(),network:$('docker-network').value,cpus:Number($('docker-cpus').value),memory:$('docker-memory').value.trim(),pids_limit:Number($('docker-pids').value)}}
+function dockerProgress(text){
+ $('docker-progress').textContent=text;
+ const phase=Number(text.match(/^(\d)\/4/)?.[1]||0),done=text.startsWith('Ready');
+ for(let i=1;i<=4;i++)$('docker-step-'+i).dataset.state=done||phase>i?'done':phase===i?'active':'idle';
+ $('docker-form').setAttribute('aria-busy',String(dockerBusy));
+}
+async function startDockerProject(){
  if(dockerBusy)throw Error('Docker setup is already running.');
  dockerBusy=true;const button=$('docker-start');button.disabled=true;
  try{
   if(!$('root').value.trim())throw Error('Select a project in Workspace first.');
   const current=await api('/api/state');
   if(current.root!==$('root').value.trim())throw Error('Save your selected project under Workspace before starting Docker.');
-  const desired=dockerInput(),prior=current.docker||{};
-  if(prior.container_id && prior.ready && prior.image===desired.image && prior.workdir===desired.workdir && prior.network===desired.network && (!desired.context||desired.context===prior.context)){
+  const desired=dockerInput(),prior=await api('/api/docker/status');
+  if(prior.container_missing){
+   dockerProgress('1/4 · Clearing the missing container selection…');
+   await api('/api/docker/action',{action:'detach'});
+   prior.container_id=null;
+  }else if(prior.workspace_matches===false){
+   if(prior.container_id)throw Error('Forget the previous project container selection under Container management before starting this project.');
+  }else if(prior.error&&(!prior.container_id||!prior.container_state)){throw Error(prior.error)}
+  const sameSettings=['image','workdir','network','cpus','memory','pids_limit'].every(key=>prior[key]===desired[key])&&(!desired.context||desired.context===prior.context);
+  if(prior.container_id && prior.ready && sameSettings){
    dockerProgress('Project container is ready. Applying the command profile…');
    if(current.profile.environment!=='docker'||current.profile.shell!=='sh'){
     await api('/api/configure',{root:current.root,alias:current.workspace||'workspace',permissions:current.permissions,profile:{...current.profile,environment:'docker',shell:'sh'},targets:current.targets,allow_private:current.allow_private});
@@ -301,7 +330,7 @@ submitLocal('docker-form',async()=>{
    }
    dockerProgress('Ready · Live Docker is selected for project commands.');return;
   }
-  if(prior.container_id && (prior.image!==desired.image||prior.workdir!==desired.workdir||prior.network!==desired.network||(desired.context&&desired.context!==prior.context))){
+  if(prior.container_id && !sameSettings){
    throw Error('A different container is selected. Remove or detach it under Advanced actions before changing Docker settings.');
   }
   dockerProgress('1/4 · Saving Docker configuration…');
@@ -335,8 +364,10 @@ submitLocal('docker-form',async()=>{
   dockerProgress('Ready · Live Docker is now selected for project commands.');
   dockerStatus(status);
  }catch(error){dockerProgress('Setup stopped: '+error.message);throw error}
- finally{dockerBusy=false;button.disabled=false}
-},'Docker setup verified. Select Live Docker under Workspace to use this container.');
+ finally{dockerBusy=false;button.disabled=false;$('docker-form').setAttribute('aria-busy','false')}
+}
+submitLocal('docker-form',startDockerProject,'Docker is ready and selected for project commands.');
+$('docker-refresh').onclick=()=>runLocal($('docker-refresh'),async()=>{dockerStatus(await api('/api/docker/status'))},'Docker status refreshed.');
 
 for(const button of document.querySelectorAll('[data-docker-action]'))button.onclick=()=>runLocal(button,async()=>{const action=button.dataset.dockerAction,data={action};if(action==='attach'){data.container=$('docker-container').value.trim();if(!data.container)throw Error('Enter the container name or ID to attach.');data.allow_broad_access=$('docker-broad').checked}const result=await api('/api/docker/action',data);if(action==='logs'){$('docker-result').hidden=false;$('docker-result').textContent=typeof result.logs==='string'?result.logs:JSON.stringify(result,null,2)}},button.dataset.dockerAction==='pull'?'Image preparation finished.':'Docker action finished.');
 submitLocal('skill-form',async()=>{await api('/api/integrations/add',{entry:{type:'skill',name:$('skill-name').value.trim(),path:$('skill-path').value.trim()}});$('skill-name').value='';$('skill-path').value=''},'Selected skill added.');
@@ -390,6 +421,7 @@ window.addEventListener('popstate',()=>{
 });
 function modeHelp(){
  const value=$('profile-environment').value;
+ $('snapshot-settings').hidden=value!=='container';
  $('mode-help').textContent=value==='docker'?'Live Docker mounts your real project folder. Set it up in Docker first.':value==='host'?'Host commands use your account and always require local approval.':'Isolated snapshots run against copied, filtered files. Changes may need approval to sync.';
 }
 $('profile-environment').addEventListener('change',modeHelp);

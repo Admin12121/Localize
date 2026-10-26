@@ -31,11 +31,7 @@ def test_local_control_login_origin_csrf_and_separate_authority(tmp_path):
         status,headers,body=req('/api/login',{'code':'private-local-login-code'})
         assert status==200 and body['csrf']
         cookie=headers['Set-Cookie'].split(';')[0]
-        status, asset_headers, svg = req('/assets/scene.svg', cookie=cookie)
-        assert status == 200
-        assert 'image/svg+xml' in asset_headers['Content-Type']
-        assert b'viewBox="0 0 1310 1105"' in svg
-        assert b'2,087' not in svg and b'Snyk Scan' not in svg
+        assert req('/assets/scene.svg', cookie=cookie)[0] == 404
         status,state_headers,state=req('/api/state',cookie=cookie)
         assert status==200
         assert req('/api/state',cookie=cookie,extra={'If-None-Match':state_headers['ETag']})[0]==304
@@ -89,7 +85,7 @@ def test_single_file_launcher_help_and_local_only_start(tmp_path):
             line=process.stdout.readline();lines.append(line)
             if 'Local-only launch' in line or not line:break
         assert process.poll() is None
-        assert any('3.2.3' in line for line in lines)
+        assert any('3.2.4' in line for line in lines)
         assert (runtime/'site-connection-key').is_file()
     finally:process.terminate();process.communicate(timeout=8)
 
@@ -101,7 +97,7 @@ def test_bundle_about_metadata_does_not_start_a_companion(tmp_path):
     assert result.returncode==0
     metadata=json.loads(result.stdout)
     assert metadata['author']==metadata['creator']=='admin12121'
-    assert metadata['license']=='MIT' and metadata['version']=='3.2.3'
+    assert metadata['license']=='MIT' and metadata['version']=='3.2.4'
     assert not runtime.exists()
     assert Companion(None,tmp_path/'runtime').bridge_status()['creator']=='admin12121'
 
@@ -136,30 +132,3 @@ def test_local_dashboard_focuses_on_one_docker_start_and_separate_views():
     assert "sessionStorage.setItem('localize-view'" not in html
     assert 'data-docker-action="attach"' in html
     assert 'data-docker-action="remove"' in html
-
-
-def test_original_svg_geometry_is_used_without_example_findings():
-    import xml.etree.ElementTree as ET
-    from web_bridge.resources import UI_ROOT
-    original = (UI_ROOT / 'scene-original.svg').read_text(encoding='utf-8')
-    dashboard = (UI_ROOT / 'scene-dashboard.svg').read_text(encoding='utf-8')
-    original_root = ET.fromstring(original)
-    dashboard_root = ET.fromstring(dashboard)
-    assert original_root.get('viewBox') == dashboard_root.get('viewBox') == '0 0 1310 1105'
-    def paths(root):
-        return [
-            element.attrib['d']
-            for element in root.iter()
-            if element.tag.rsplit('}', 1)[-1] == 'path' and 'd' in element.attrib
-        ]
-    assert len(paths(original_root)) == 78
-    assert len(paths(dashboard_root)) == 78
-    assert paths(original_root) == paths(dashboard_root)
-    for sample in ('2,087', '1,227', '378', 'Snyk Scan', 'At Risk'):
-        assert sample not in dashboard
-    from web_bridge.resources import UI_ROOT
-    scene_script = (UI_ROOT / 'scene.js').read_text(encoding='utf-8')
-    html = (UI_ROOT / 'control.html').read_text(encoding='utf-8')
-    assert 'paintScene(s)' in scene_script and 'sceneCounts(s)' in scene_script
-    assert '__SCENE_JS__' in html
-    assert 'id="bridge-scene"' in html
