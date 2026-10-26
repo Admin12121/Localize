@@ -433,8 +433,6 @@ class Workspace:
         """
         from web_bridge.workspace.operations import FileOperations
 
-        # The shared native primitive needs only workspace, not the operation
-        # registry/runtime directory used by FileOperations' public interface.
         renamer = FileOperations.__new__(FileOperations)
         renamer.workspace = self
         backup = ".web-bridge-backup-" + secrets.token_hex(16)

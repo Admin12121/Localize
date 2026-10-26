@@ -75,51 +75,18 @@ class WindowsGroup:
             self.close()
             raise OSError("Unable to establish owned Windows process group.")
 
-        class THREAD(ctypes.Structure):
-            _fields_ = [
-                ("size", w.DWORD),
-                ("usage", w.DWORD),
-                ("thread", w.DWORD),
-                ("owner", w.DWORD),
-                ("base", w.LONG),
-                ("delta", w.LONG),
-                ("flags", w.DWORD),
-            ]
-
-        api.CreateToolhelp32Snapshot.argtypes = [w.DWORD, w.DWORD]
-        api.CreateToolhelp32Snapshot.restype = w.HANDLE
-        api.Thread32First.argtypes = [w.HANDLE, ctypes.POINTER(THREAD)]
-        api.Thread32Next.argtypes = [w.HANDLE, ctypes.POINTER(THREAD)]
-        api.OpenThread.argtypes = [w.DWORD, w.BOOL, w.DWORD]
-        api.OpenThread.restype = w.HANDLE
-        api.ResumeThread.argtypes = [w.HANDLE]
-        api.ResumeThread.restype = w.DWORD
-        snapshot = api.CreateToolhelp32Snapshot(4, 0)
-        entry = THREAD()
-        entry.size = ctypes.sizeof(entry)
-        resumed = False
-        try:
-            # Enumeration does not identify the primary thread. A suspended
-            # helper can precede it, so visit every owned snapshot thread once.
-            # Only a previous count of one means a thread actually restarted;
-            # never loop away suspensions held by another component.
-            ok = api.Thread32First(snapshot, ctypes.byref(entry))
-            while ok:
-                if entry.owner == process.pid:
-                    thread = api.OpenThread(2, False, entry.thread)
-                    if thread:
-                        try:
-                            previous = api.ResumeThread(thread)
-                            if previous == 1:
-                                resumed = True
-                        finally:
-                            api.CloseHandle(thread)
-                ok = api.Thread32Next(snapshot, ctypes.byref(entry))
-        finally:
-            api.CloseHandle(snapshot)
-        if not resumed:
+        # Resume the Job Object's process: thread enumeration can leave its primary thread suspended.
+        native = ctypes.WinDLL("ntdll")
+        resume_process = native.NtResumeProcess
+        resume_process.argtypes = [w.HANDLE]
+        resume_process.restype = ctypes.c_long  # NTSTATUS
+        status = resume_process(int(process._handle))
+        if status != 0:
             self.close()
-            raise OSError("Unable to resume suspended Windows command.")
+            raise OSError(
+                "Unable to resume owned Windows command "
+                f"(NTSTATUS 0x{status & 0xFFFFFFFF:08x})."
+            )
 
     def kill(self):
         with self.lock:

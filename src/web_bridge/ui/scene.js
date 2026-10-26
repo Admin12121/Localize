@@ -1,7 +1,4 @@
-/* The original SVG geometry is stored unchanged in scene-original.svg.
- * scene-dashboard.svg removes its sample findings; this controller binds
- * only values actually reported by the local companion.
- */
+/* Original SVG geometry is preserved; metrics come from local companion state. */
 const SVG_NS='http://www.w3.org/2000/svg';
 let sceneNode=null,sceneLoading=null,sceneKey='';
 function sceneLabel(group,x,y,value,anchor='start',cls='scene-runtime-text'){
@@ -17,8 +14,6 @@ async function loadScene(){
   const response=await fetch('/assets/scene.svg',{credentials:'same-origin'});
   if(!response.ok)throw Error('SVG asset is not available ('+response.status+')');
   const body=await response.text();
-  // The pasted Vue-rendered SVG omits the explicit SVG xmlns. Add only the
-  // namespace required for standalone XML parsing; its paths remain intact.
   const xml=body.includes('xmlns="http://www.w3.org/2000/svg"')
    ? body : body.replace(/^<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
   const doc=new DOMParser().parseFromString(xml,'image/svg+xml');
@@ -26,8 +21,6 @@ async function loadScene(){
   const svg=document.importNode(doc.documentElement,true);
   if(svg.localName!=='svg'||svg.getAttribute('viewBox')!=='0 0 1310 1105')
    throw Error('Unexpected SVG asset.');
-  // Canvas dots belong to the original Vue renderer; recreate only that
-  // background texture without changing any supplied path coordinates.
   svg.querySelectorAll('foreignObject,script,animate,animateTransform').forEach(x=>x.remove());
   const defs=svg.querySelector('defs');
   const pattern=document.createElementNS(SVG_NS,'pattern');

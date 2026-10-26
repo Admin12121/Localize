@@ -41,7 +41,7 @@ INSTRUCTIONS = (
 
 
 def operation_identity(name, arguments):
-    # Session IDs and retry keys do not change the actual requested mutation.
+    # Retry identifiers must not alter the mutation's real identity.
     semantic = {
         key: value
         for key, value in arguments.items()
@@ -57,8 +57,6 @@ def operation_identity(name, arguments):
         "arguments_sha256": digest,
         "argument_keys": sorted(semantic),
     }
-    # Preserve enough to inspect uncertain work without copying file contents,
-    # MCP payloads or credential-bearing objects into the operation journal.
     for key in (
         "path",
         "destination",
@@ -108,7 +106,7 @@ class OpenAIResponsesProvider:
                 raise AgentRunnerError(
                     "The configured API key environment variable is missing."
                 )
-            # A transport retry must not silently consume another generation budget.
+            # Do not consume another generation budget on a transport retry.
             client = OpenAI(api_key=key, max_retries=0, timeout=timeout_seconds)
         inputs = [
             {"role": "user", "content": json.dumps(task, ensure_ascii=True)}
@@ -375,8 +373,7 @@ class AgentRunner:
         renewal_stop = threading.Event()
 
         def renew_leases():
-            # Hold exclusion through an in-flight callback even if the run budget
-            # has elapsed. The loop checks budget again before starting any tool.
+            # Hold the writer lease through an in-flight mutation.
             while not renewal_stop.wait(LEASE_HEARTBEAT_SECONDS):
                 try:
                     ttl = config["max_seconds"] + 60
@@ -571,7 +568,7 @@ class AgentRunner:
         except BudgetExceeded:
             save("partial", "Remaining token/time budget cannot fit another response.")
         except Exception as exc:
-            # API/transport exceptions can contain request headers or credential values.
+            # External exceptions may contain credentials; return sanitized messages.
             message = (
                 str(exc)
                 if isinstance(exc, (AgentRunnerError, TaskStoreError))
@@ -612,7 +609,6 @@ class AgentRunner:
             for run in runs:
                 run["shutdown"] = True
                 run["cancel"].set()
-        # Callbacks must have their own bounded execution/cancellation policy.
         for run in runs:
             if run["thread"] is not threading.current_thread():
                 run["thread"].join(timeout=2)

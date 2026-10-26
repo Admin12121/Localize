@@ -30,7 +30,6 @@ def rpc(message, bridge):
     name = message.get("method")
     try:
         if name == "initialize":
-            # Don't advertise an unknown newer protocol than the client's version
             client_protocol = message.get("params", {}).get(
                 "protocolVersion", "2025-03-26"
             )

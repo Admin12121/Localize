@@ -104,7 +104,7 @@ class Jobs:
             db.execute(
                 "CREATE INDEX IF NOT EXISTS receipt_recovery_scope ON receipts(workspace_scope,recovery_required)"
             )
-            # Receipts are evidence only. Never deserialize live work or signal a saved PID.
+            # Persisted receipts are evidence, not commands to replay or saved PIDs to signal.
             condition = "" if migration else " WHERE settled=0 OR summary IS NULL"
             for key, raw, settled, scope, required in db.execute(
                 "SELECT job_id,result,settled,workspace_scope,recovery_required FROM receipts"
@@ -304,7 +304,6 @@ class Jobs:
 
     @contextmanager
     def database(self):
-        # Connections never outlive one short operation, including worker cleanup.
         db = None
         try:
             db = sqlite3.connect(self.receipt_path, timeout=10)
@@ -320,7 +319,6 @@ class Jobs:
                 db.close()
 
     def close(self):
-        # No shared database handle can race an in-flight command finalizer.
         pass
 
     def result(self, job):
@@ -368,7 +366,6 @@ class Jobs:
     def persist(self, job, settled=None):
         result = self.result(job)
         result["output"] = result["output"][:64_000]
-        # Proposal content remains in workspace approvals, not execution history.
         result["change_summary"] = {
             "count": len(result["changes"]),
             "unapplied_count": sum("error" in item for item in result["changes"]),
@@ -422,8 +419,7 @@ class Jobs:
             self.compact(db)
 
     def compact(self, db):
-        # Keep full bounded output for the newest 160 receipts. Tombstone keys
-        # and execution evidence are never deleted, so rotation cannot replay work.
+        # Retention must not delete idempotency keys or execution evidence.
         rows = db.execute(
             "SELECT job_id,result FROM receipts WHERE settled=1 AND archived=0 AND job_id NOT IN (SELECT job_id FROM receipts ORDER BY submitted DESC LIMIT 160)"
         ).fetchall()
@@ -663,7 +659,6 @@ class Jobs:
                     raise WorkspaceError(
                         "Batch files require an explicitly approved cmd.exe invocation."
                     )
-                # Preserve argv[0] aliases: BusyBox selects its shell by this name.
                 request["argv"][0] = os.path.abspath(executable)
             elif environment == "container":
                 request["image_id"] = self.container_ready(image)
@@ -842,7 +837,7 @@ class Jobs:
                 )
             except (OSError, subprocess.TimeoutExpired):
                 self.cleanup_unknown(job)
-        # A failed engine cancellation must never skip local CLI termination.
+        # Failed Docker cancellation must still terminate the local CLI.
         if process:
             try:
                 if os.name == "nt" and job["group"]:
@@ -888,7 +883,6 @@ class Jobs:
                         "Ten retained command snapshots exist. Inspect/discard them in local controls before more snapshot jobs."
                     )
                 snapshot = workspace.snapshot(stage)
-                # Docker's unprivileged user must be able to traverse its isolated copy.
                 for folder, dirs, files in os.walk(stage):
                     os.chmod(folder, 0o777)
                     for name in files:
@@ -1005,8 +999,7 @@ class Jobs:
             output_errors = []
 
             def capture_output():
-                # A descendant can retain stdout after its parent exits.
-                # Never let pipe EOF determine the command's terminal state.
+                # Child processes may retain stdout after their parent exits.
                 try:
                     while not output_stop.is_set():
                         block = process.stdout.read1(4096)
@@ -1025,9 +1018,7 @@ class Jobs:
                                 self.persist(job)
                                 job["output_saved"] = True
                 except Exception as exc:
-                    # This thread is a required part of durable execution:
-                    # losing its receipt must abort the command rather than
-                    # silently waiting for a possibly long-running child.
+                    # Receipt persistence failures must abort durable command execution.
                     output_errors.append(exc)
                     output_failed.set()
                 finally:
@@ -1044,9 +1035,6 @@ class Jobs:
                     break
                 except subprocess.TimeoutExpired:
                     continue
-            # The command has exited. Clean up descendants before reading
-            # staged results so inherited pipes and late writes cannot block
-            # finalization or race file synchronization.
             if job["group"]:
                 job["group"].close()
                 job["group"] = None

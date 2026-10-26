@@ -147,7 +147,6 @@ class TaskActions:
             return result
 
     def configure_runner(self, config):
-        # Owner chooses budgets/model, but tool schemas and authority come from us.
         from web_bridge.transport.rpc import TOOL_DEFINITIONS
 
         allowed = {
@@ -299,8 +298,7 @@ class TaskActions:
             if active_job:
                 item = self.jobs.items.get(active_job)
                 if item and item["state"] not in ("pending", "denied", "expired"):
-                    # Cancelled is a public outcome, not proof cleanup finished.
-                    # The runner retains its lease until the owned process drains.
+                    # Cancellation does not prove cleanup has finished.
                     while not item["settled"].wait(0.1):
                         pass
             self.actor.owner = None

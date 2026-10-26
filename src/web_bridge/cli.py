@@ -25,7 +25,6 @@ def find_cloudflared():
     installed = shutil.which("cloudflared")
     if installed:
         return installed
-    # Fresh installs may not be visible in the current terminal's PATH yet.
     candidates = [
         Path("/opt/homebrew/bin/cloudflared"),
         Path("/usr/local/bin/cloudflared"),
@@ -65,7 +64,7 @@ def secure_runtime(path):
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path, 0o700)
     if os.name == "nt":
-        # A user-only DACL protects persistent keys; POSIX chmod alone cannot do this on Windows.
+        # Windows runtime secrets require a user-only ACL.
         import ctypes
         from ctypes import wintypes
 

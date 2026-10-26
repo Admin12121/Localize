@@ -1,5 +1,5 @@
 {
-  "bridge_version": "3.2.1",
+  "bridge_version": "3.2.2",
   "tools": [
     {
       "name": "list_targets",

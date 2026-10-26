@@ -2,7 +2,7 @@
 
 **Connect ChatGPT to your project, with permissions controlled on your computer.**
 
-Version **3.2.1** · Setup plugin **1.2.1** · Created by [admin12121](https://github.com/Admin12121) · [MIT license](LICENSE)
+Version **3.2.2** · Setup plugin **1.2.2** · Created by [admin12121](https://github.com/Admin12121) · [MIT license](LICENSE)
 
 Read and update files, run approved host or Docker commands, connect selected skills/MCP applications, and save work for later continuation. A private Site forwards authenticated calls to the local Python companion. The local control panel selects the project and grants access.
 
@@ -16,13 +16,13 @@ Complete setup has four steps: **[install locally](#install-once-then-run-locali
 **Windows PowerShell:**
 
 ```powershell
-irm https://github.com/Admin12121/Localize/releases/download/v3.2.1/install.ps1 | iex
+irm https://github.com/Admin12121/Localize/releases/download/v3.2.2/install.ps1 | iex
 ```
 
 **macOS / Linux:**
 
 ```sh
-curl -fsSL https://github.com/Admin12121/Localize/releases/download/v3.2.1/install.sh | sh
+curl -fsSL https://github.com/Admin12121/Localize/releases/download/v3.2.2/install.sh | sh
 ```
 
 After installation, open a new terminal once and run from any folder:
@@ -40,20 +40,20 @@ Use `localizeit --local-only` for local controls without a tunnel/download. `loc
 For users who already have uv, the direct alternative is:
 
 ```sh
-uv tool install https://github.com/Admin12121/Localize/releases/download/v3.2.1/localizeit-3.2.1-py3-none-any.whl
+uv tool install https://github.com/Admin12121/Localize/releases/download/v3.2.2/localizeit-3.2.2-py3-none-any.whl
 uv tool update-shell
 ```
 
 Open a new terminal once, then run `localizeit`.
 
-The primary package and command are both **`localizeit`**. Distribution uses [GitHub Releases](https://github.com/Admin12121/Localize/releases/tag/v3.2.1); bare `uvx localizeit` searches PyPI and is not the installation route. Individual release assets have SHA-256 checksums in `SHA256SUMS`. To remove the installed commands later, use `uv tool uninstall localizeit`; saved project configuration remains in your per-user runtime folder.
+The primary package and command are both **`localizeit`**. Distribution uses [GitHub Releases](https://github.com/Admin12121/Localize/releases/tag/v3.2.2); bare `uvx localizeit` searches PyPI and is not the installation route. Individual release assets have SHA-256 checksums in `SHA256SUMS`. To remove the installed commands later, use `uv tool uninstall localizeit`; saved project configuration remains in your per-user runtime folder.
 
 ## Upgrade an existing Localize installation
 
-The **v3.2.1** update refreshes the local dashboard (navigation, Docker setup, and the original SVG operational scene). Existing users do **not** need to create a new Site or reinstall the ChatGPT plugin to update the local companion.
+The **v3.2.2** update refreshes the local dashboard (navigation, Docker setup, and the original SVG operational scene). Existing users do **not** need to create a new Site or reinstall the ChatGPT plugin to update the local companion.
 
 1. Stop the running `localizeit` companion on your computer (leave its runtime/data folder in place).
-2. Re-run the [Windows installer](https://github.com/Admin12121/Localize/releases/download/v3.2.1/install.ps1) or [macOS/Linux installer](https://github.com/Admin12121/Localize/releases/download/v3.2.1/install.sh) shown above. The installer uses `uv tool install --force` and verifies the wheel checksum.
+2. Re-run the [Windows installer](https://github.com/Admin12121/Localize/releases/download/v3.2.2/install.ps1) or [macOS/Linux installer](https://github.com/Admin12121/Localize/releases/download/v3.2.2/install.sh) shown above. The installer uses `uv tool install --force` and verifies the wheel checksum.
 3. Launch `localizeit` again; open the local dashboard at `/overview` and verify the version through `localizeit --about`.
 4. If the tunnel endpoint changed, update the **Companion endpoint** on your existing private Site. Do not create a new connection key unless you intentionally rotated it.
 5. **Optional gateway refresh:** to update the Site's bundled downloads and interface, open the *existing* Site's builder session, attach `web-bridge-setup-plugin.zip` from this release, and follow [Upgrade an existing Site](#upgrade-an-existing-site). Preserve the same Site identity and existing secrets.
@@ -66,7 +66,7 @@ This is a one-time setup in your own ChatGPT account. The Site hosts the bridge 
 
 ### First-time setup
 
-1. Download [web-bridge-setup-plugin.zip from the GitHub release](https://github.com/Admin12121/Localize/releases/download/v3.2.1/web-bridge-setup-plugin.zip).
+1. Download [web-bridge-setup-plugin.zip from the GitHub release](https://github.com/Admin12121/Localize/releases/download/v3.2.2/web-bridge-setup-plugin.zip).
 2. Open **ChatGPT Work on the web**, or **Codex in the ChatGPT desktop app**, in the account/workspace that should own the Site. Use a chat with **Sites publishing and file/build tools** available. You can mention **@Sites**; Plugin Creator can also route a custom-tools request through Sites when available. Account/workspace permissions determine availability. See [OpenAI's Sites guide](https://learn.chatgpt.com/docs/sites) and [custom MCP setup guide](https://learn.chatgpt.com/docs/extend/mcp).
 3. **Attach the downloaded ZIP to that chat as project source**, then send the prompt below. The archive contains the gateway source and the `setup-web-bridge` skill. Attaching or installing this setup archive alone does not deploy the gateway or install its generated tools plugin.
 
@@ -157,7 +157,7 @@ The standalone `.pyz` is a compatibility option for users who manage Python and 
 ## Share with other people
 
 - **Give someone access to an existing deployment:** share the plugin through its supported sharing controls and give the recipient viewer access to its Site. They install that plugin, run the local installer on their own computer, and save their own endpoint/key in the authorized Site connection page. Each person needs the applicable account/workspace permissions. See [OpenAI's sharing guide](https://learn.chatgpt.com/docs/build-plugins#share-the-plugin-with-your-team).
-- **Give someone an independent private deployment:** send the [GitHub release link](https://github.com/Admin12121/Localize/releases/tag/v3.2.1). They follow [first-time Site setup](#first-time-setup) in their own account, install the generated plugin, and connect their own `localizeit` instance. The ZIP provides source/instructions; it does not transfer your Site or credentials.
+- **Give someone an independent private deployment:** send the [GitHub release link](https://github.com/Admin12121/Localize/releases/tag/v3.2.2). They follow [first-time Site setup](#first-time-setup) in their own account, install the generated plugin, and connect their own `localizeit` instance. The ZIP provides source/instructions; it does not transfer your Site or credentials.
 
 Share release files and instructions, not runtime folders, connection keys or selected project contents. Build assets are in `dist/release/`; local packaging and GitHub publication do not deploy a ChatGPT Site or install a plugin in another account.
 
@@ -203,7 +203,7 @@ Enable selected skills/MCP tools locally. Load the built-in `web-bridge-project-
 MCP adapters and the optional local agent require Python **3.11+**. For the GitHub launcher, request the extras in the same isolated environment:
 
 ```sh
-uvx --python 3.12 --from "localizeit[integrations,agent] @ https://github.com/Admin12121/Localize/releases/download/v3.2.1/localizeit-3.2.1-py3-none-any.whl" localizeit
+uvx --python 3.12 --from "localizeit[integrations,agent] @ https://github.com/Admin12121/Localize/releases/download/v3.2.2/localizeit-3.2.2-py3-none-any.whl" localizeit
 ```
 
 Use only `integrations` or `agent` inside the brackets if you need one feature. For a persistent installation, use `uv tool install --python 3.12 --force` followed by that same quoted package URL. Installing extras does not grant access or start a paid model call. For source or standalone `.pyz` runs, install `requirements/integrations.txt` and/or `requirements/agent.txt` with pip into the Python environment that launches the companion.

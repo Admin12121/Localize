@@ -124,8 +124,6 @@ def test_real_stdio_timeout_does_not_replay_side_effect(tmp_path,monkeypatch,sta
         registry.call('fixture','slow',{'path':str(marker)})
     assert time.monotonic()-started<12
     assert not marker.exists()
-    # Timeout can precede tool dispatch. Observe the actual owned process,
-    # rather than assuming the tool had time to write its PID file.
     assert len(processes)==1,'A timed-out request must never spawn a retry.'
     assert processes[0].returncode is not None,'Timed-out MCP subprocess survived cleanup.'
 

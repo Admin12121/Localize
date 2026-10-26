@@ -97,6 +97,33 @@ def test_shell_commands_create_files_with_real_windows_adapters(tmp_path,shell,c
         assert (root/filename).read_text(encoding='utf-8-sig').strip()=='done'
     finally:c.close()
 
+@pytest.mark.skipif(os.name!='nt', reason='Windows native process resume')
+def test_powershell_repeated_owned_launches_are_not_left_suspended(tmp_path):
+    """Exercise native Job Object assignment + process resume repeatedly.
+
+    The previous thread-snapshot launcher could report a running PID while
+    the primary thread never started. This test uses real PowerShell, real
+    receipts and five distinct project-file side effects.
+    """
+    c, root = ready(tmp_path)
+    try:
+        for number in range(5):
+            name = f'resume-{number}.txt'
+            job = c.command_request(
+                command=f"Set-Content -LiteralPath '{name}' -Value 'started'",
+                shell='powershell',
+                idempotency_key=f'real-powershell-resume-{number}',
+                workspace_id=c.workspace_id,
+            )
+            c.approve_command(job['job_id'], True)
+            result = wait(c, job, timeout=20)
+            assert result['state'] == 'completed', result
+            assert result['success'] is True, result
+            assert (root / name).read_text(encoding='utf-8-sig').strip() == 'started'
+    finally:
+        c.close()
+
+
 @pytest.mark.skipif(os.name!='nt',reason='Windows npm launcher')
 def test_npm_command_through_selected_cmd_shell_runs(tmp_path):
     import shutil

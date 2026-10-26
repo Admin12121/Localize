@@ -86,8 +86,6 @@ def source_payload():
         "drizzle.config.ts",
     ):
         entries[name] = clean_bytes(ROOT / name)
-    # The source repository retains the architecture illustrations referenced
-    # by its canonical README. Runtime/setup bundles omit them.
     for path in sorted((ROOT / "images").glob("*.png")):
         if path.is_file() and not path.is_symlink():
             entries[path.relative_to(ROOT).as_posix()] = path.read_bytes()

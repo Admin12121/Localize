@@ -27,7 +27,6 @@ def main():
         raise SystemExit(
             "Destination already exists. Export to an empty path; no files were overwritten."
         )
-    # Canonical curated source, not extracted Companion/, Plugin/ or local runtime state.
     import subprocess
 
     subprocess.run(

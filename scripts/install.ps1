@@ -1,12 +1,11 @@
-# Install the Localize command for the current user from a verified GitHub wheel.
 [CmdletBinding()]
 param(
     [string] $Python = '3.12',
     [switch] $NoModifyPath
 )
 $ErrorActionPreference = 'Stop'
-$release = 'https://github.com/Admin12121/Localize/releases/download/v3.2.1'
-$wheel = 'localizeit-3.2.1-py3-none-any.whl'
+$release = 'https://github.com/Admin12121/Localize/releases/download/v3.2.2'
+$wheel = 'localizeit-3.2.2-py3-none-any.whl'
 
 function Find-LocalizeUv {
     $command = Get-Command uv -ErrorAction SilentlyContinue
@@ -41,7 +40,7 @@ if (-not $uv) {
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('localizeit-install-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temporary | Out-Null
 try {
-    Write-Host 'Downloading Localize v3.2.1 from GitHub and checking SHA-256...'
+    Write-Host 'Downloading Localize v3.2.2 from GitHub and checking SHA-256...'
     $wheelPath = Join-Path $temporary $wheel
     $sumPath = Join-Path $temporary 'SHA256SUMS'
     Invoke-WebRequest -UseBasicParsing -Uri "$release/SHA256SUMS" -OutFile $sumPath -TimeoutSec 60

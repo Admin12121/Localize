@@ -3,7 +3,6 @@
 
 .split>button{flex-shrink:0;white-space:nowrap}
 
-/* Stable activity viewport; details retain their own disclosure state. */
 .activity-list{max-height:500px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:0 16px}
 .activity-row{margin:0;border-bottom:1px solid var(--border)}
 .activity-row:last-child{border-bottom:0}
@@ -22,7 +21,6 @@
 .approval-row pre{max-height:210px}.approval-row details{margin-top:8px}
 .load-more{width:100%;border:0;border-top:1px solid var(--border);border-radius:0 0 12px 12px}
 
-/* Localize dashboard: focused sections, a compact summary, and simple navigation. */
 .local-main{max-width:1440px}
 .dashboard-layout{display:grid;grid-template-columns:205px minmax(0,1fr);gap:28px;align-items:start}
 .dashboard-nav{position:sticky;top:18px;display:flex;flex-direction:column;gap:5px;padding:10px;border:1px solid var(--border);border-radius:13px;background:var(--card)}
@@ -50,11 +48,9 @@
 @media(max-width:850px){.dashboard-layout{grid-template-columns:1fr;gap:15px}.dashboard-nav{position:static;display:flex;flex-direction:row;flex-wrap:wrap;gap:2px}.dashboard-nav a{padding:9px 11px;font-size:12px}.nav-help{display:none}}
 @media(max-width:520px){.summary-grid{grid-template-columns:1fr}.dashboard-nav{flex-wrap:nowrap;overflow:auto}.dashboard-nav a{white-space:nowrap}.nav-mark{display:none}}
 
-/* Sidebar links are real application routes; no full reload for ordinary clicks. */
 .dashboard-nav a{display:flex;text-decoration:none;min-height:42px}
 .dashboard-nav a:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}
 
-/* Supplied SVG scene: original 1,310×1,105 geometry is preserved. */
 .dashboard-page>.scene-frame{max-width:none}
 .scene-frame{background:#05282d;border:1px solid #235055}
 .scene-frame .frame-header{color:#dceceb}

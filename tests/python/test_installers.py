@@ -10,7 +10,7 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-WHEEL = 'localizeit-3.2.1-py3-none-any.whl'
+WHEEL = 'localizeit-3.2.2-py3-none-any.whl'
 
 
 @pytest.mark.parametrize('checksum', ['valid', 'mismatch', 'missing', 'duplicate'])
@@ -27,7 +27,6 @@ def test_installer_verifies_release_before_registering_command(tmp_path, checksu
     if checksum == 'missing': line = f'{digest}  another-wheel.whl\n'
     if checksum == 'duplicate': line += line
     (fixture/'SHA256SUMS').write_text(line,encoding='utf-8')
-    # Spaces in the command directory and temp paths must survive both shells.
     tool_bin = tmp_path/'installed commands'
     env = {**os.environ, 'PATH':str(Path(uv).parent)+os.pathsep+os.environ['PATH'],
            'UV_TOOL_DIR':str(tmp_path/'tools'), 'UV_TOOL_BIN_DIR':str(tool_bin),
@@ -39,7 +38,7 @@ def test_installer_verifies_release_before_registering_command(tmp_path, checksu
         wrapper.write_text('''$ErrorActionPreference = 'Stop'
 function Invoke-WebRequest {
     param($UseBasicParsing, $Uri, $OutFile, $TimeoutSec)
-    if (-not $Uri.StartsWith('https://github.com/Admin12121/Localize/releases/download/v3.2.1/')) { throw 'Unexpected download host.' }
+    if (-not $Uri.StartsWith('https://github.com/Admin12121/Localize/releases/download/v3.2.2/')) { throw 'Unexpected download host.' }
     Copy-Item -LiteralPath (Join-Path $env:LOCALIZEIT_FIXTURE_DIR ([IO.Path]::GetFileName(([Uri]$Uri).AbsolutePath))) -Destination $OutFile
 }
 & $env:LOCALIZEIT_INSTALLER -NoModifyPath -Python $env:LOCALIZEIT_PYTHON
@@ -52,7 +51,7 @@ function Invoke-WebRequest {
 import os, pathlib, shutil, sys
 args=sys.argv[1:]
 url=next(arg for arg in args if arg.startswith('https://'))
-assert url.startswith('https://github.com/Admin12121/Localize/releases/download/v3.2.1/')
+assert url.startswith('https://github.com/Admin12121/Localize/releases/download/v3.2.2/')
 shutil.copyfile(pathlib.Path(os.environ['LOCALIZEIT_FIXTURE_DIR'])/url.rsplit('/',1)[1],args[args.index('--output')+1])
 ''',encoding='utf-8')
         curl.chmod(0o700)
@@ -69,5 +68,5 @@ shutil.copyfile(pathlib.Path(os.environ['LOCALIZEIT_FIXTURE_DIR'])/url.rsplit('/
     assert executable.is_file()
     about = subprocess.run([str(executable),'--about'],env=env,capture_output=True,text=True,encoding='utf-8',timeout=15)
     assert about.returncode == 0,about.stderr
-    assert json.loads(about.stdout)['version']=='3.2.1'
+    assert json.loads(about.stdout)['version']=='3.2.2'
     assert 'localizeit' in result.stdout

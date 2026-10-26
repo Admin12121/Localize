@@ -18,8 +18,6 @@ def test_local_control_login_origin_csrf_and_separate_authority(tmp_path):
         res=conn.getresponse();status=res.status;hdr=dict(res.getheaders());body=res.read();conn.close()
         return status,hdr,json.loads(body) if body.startswith(b'{') else body
     try:
-        # Dashboard pages are a single shell with distinct browser routes.
-        # Unauthenticated pages expose only login UI; API state stays private.
         for page in ('/', '/overview', '/workspace', '/docker',
                      '/connections', '/activity', '/agent'):
             status, headers, html = req(page)
@@ -91,7 +89,7 @@ def test_single_file_launcher_help_and_local_only_start(tmp_path):
             line=process.stdout.readline();lines.append(line)
             if 'Local-only launch' in line or not line:break
         assert process.poll() is None
-        assert any('3.2.1' in line for line in lines)
+        assert any('3.2.2' in line for line in lines)
         assert (runtime/'site-connection-key').is_file()
     finally:process.terminate();process.communicate(timeout=8)
 
@@ -103,7 +101,7 @@ def test_bundle_about_metadata_does_not_start_a_companion(tmp_path):
     assert result.returncode==0
     metadata=json.loads(result.stdout)
     assert metadata['author']==metadata['creator']=='admin12121'
-    assert metadata['license']=='MIT' and metadata['version']=='3.2.1'
+    assert metadata['license']=='MIT' and metadata['version']=='3.2.2'
     assert not runtime.exists()
     assert Companion(None,tmp_path/'runtime').bridge_status()['creator']=='admin12121'
 
@@ -136,7 +134,6 @@ def test_local_dashboard_focuses_on_one_docker_start_and_separate_views():
     assert "history.replaceState" in html
     assert "addEventListener('popstate'" in html
     assert "sessionStorage.setItem('localize-view'" not in html
-    # Keep advanced container removal and attachment explicitly available.
     assert 'data-docker-action="attach"' in html
     assert 'data-docker-action="remove"' in html
 
@@ -149,10 +146,6 @@ def test_original_svg_geometry_is_used_without_example_findings():
     original_root = ET.fromstring(original)
     dashboard_root = ET.fromstring(dashboard)
     assert original_root.get('viewBox') == dashboard_root.get('viewBox') == '0 0 1310 1105'
-    # The preserved source SVG is unnamespaced, while the standalone
-    # dashboard SVG declares the standard SVG XML namespace. ElementTree
-    # expands the latter to "{http://www.w3.org/2000/svg}path".
-    # Compare local element names so this checks geometry, not serialization.
     def paths(root):
         return [
             element.attrib['d']

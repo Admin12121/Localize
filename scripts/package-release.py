@@ -28,7 +28,6 @@ assets = {
     "install.sh": (ROOT / "scripts/install.sh").read_bytes().replace(b"\r\n", b"\n"),
     "README.md": portable_readme(),
 }
-# Include the installable CLI wheel when built; standalone bundle remains available.
 import json
 
 version = json.loads(
@@ -37,7 +36,6 @@ version = json.loads(
 wheel = out / f"localizeit-{version}-py3-none-any.whl"
 if wheel.is_file():
     assets[wheel.name] = wheel.read_bytes()
-# Publish the exact bytes that the manifest and combined archive describe.
 for name, data in assets.items():
     (out / name).write_bytes(data)
 

@@ -15,8 +15,6 @@ from web_bridge.workspace.files import WorkspaceError
 from web_bridge.transport.http import BoundedHTTPServer
 
 
-# One trusted HTML application shell, served at several local dashboard routes.
-# API routes still require the owner cookie and (for writes) a CSRF token.
 CONTROL_PAGES = frozenset({
     "/", "/overview", "/workspace", "/docker", "/connections",
     "/activity", "/agent",
@@ -101,8 +99,6 @@ class ControlHandler(BaseHTTPRequestHandler):
                 return self.send(200, page, "text/html; charset=utf-8")
             if route.path == "/assets/scene.svg":
                 from web_bridge.resources import UI_ROOT
-                # Authenticated, loopback-only, package-owned SVG. This is
-                # never served through the remote companion RPC listener.
                 return self.send(
                     200, (UI_ROOT / "scene-dashboard.svg").read_bytes(),
                     "image/svg+xml; charset=utf-8",

@@ -272,8 +272,6 @@ class FileOperations:
                 ctypes.c_void_p,
                 wintypes.DWORD,
             ]
-            # DELETE + GENERIC_READ, sharing READ only: existing writers or
-            # deleters make this fail rather than racing an approved file hash.
             handle = api.CreateFileW(
                 str(sparent / source), 0x80010000, 1, None, 3, 0x02200000, None
             )
@@ -343,8 +341,7 @@ class FileOperations:
                 return identity
             finally:
                 api.CloseHandle(handle)
-        # Ordinary POSIX rename overwrites an existing destination. Never use
-        # it as a fallback to a check-then-rename sequence.
+        # POSIX rename can overwrite; never use it as a check-then-rename fallback.
         import sys
 
         if not (sys.platform.startswith("linux") or sys.platform == "darwin"):
@@ -400,8 +397,6 @@ class FileOperations:
             sourcews.parent(sp[:-1]) as (sfd, sparent),
             ws.parent(dp[:-1]) as (dfd, dparent),
         ):
-            # Parent creation can take time. Recheck immediately at the native
-            # mutation boundary, then let the OS enforce no destination replace.
             if (
                 expected is not None
                 and self._fingerprint(source, True, sourcews) != expected
@@ -419,10 +414,7 @@ class FileOperations:
                 ):
                     raise WorkspaceError("Source changed during rename.")
             except (WorkspaceError, OSError):
-                # Directory children can still be edited through preexisting
-                # handles. Roll back the same moved object without overwriting
-                # a newly created original path; otherwise retain it for local
-                # recovery at its destination, never discard either version.
+                # Rollback must not overwrite a concurrently recreated path.
                 try:
                     self._native_rename(
                         dp[-1],
@@ -484,9 +476,7 @@ class FileOperations:
                 try:
                     self._rename(item["path"], tag, expected=item["fingerprint"])
                 except Exception:
-                    # A concurrent recreation can prevent rollback. Retain the
-                    # durable record for the moved version instead of hiding
-                    # recoverable content behind an orphaned internal name.
+                    # Retain recoverable data if rollback is blocked by a concurrent change.
                     if (ws.root / tag).exists():
                         try:
                             record["fingerprint"] = self._fingerprint(

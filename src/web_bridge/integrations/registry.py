@@ -362,8 +362,6 @@ class Integrations:
             ) from None
 
         async def run():
-            # SDK contexts own transport cleanup. Cancellation covers connection,
-            # discovery and call; no replay or automatic approval callbacks.
             with anyio.fail_after(item["timeout"]):
                 async with AsyncExitStack() as stack:
                     if item["transport"] == "stdio":
@@ -437,8 +435,6 @@ class Integrations:
                         try:
                             schema = advertised["inputSchema"]
                             Draft202012Validator.check_schema(schema)
-                            # No implicit network or filesystem retrieval for a
-                            # server-supplied $ref; local definitions still work.
                             Draft202012Validator(schema, registry=Registry()).validate(
                                 arguments
                             )
@@ -446,9 +442,6 @@ class Integrations:
                             raise IntegrationError(
                                 "MCP arguments or the selected tool schema are invalid or unsupported."
                             ) from None
-                        # The high-level Client.call_tool retries HEADER_MISMATCH
-                        # and drives input-required rounds. Use the SDK session's
-                        # single request, so an uncertain side effect never repeats.
                         result = await client.session.call_tool(tool, arguments)
                         return {
                             "server": item["name"],
@@ -460,8 +453,6 @@ class Integrations:
 
         try:
             result = asyncio.run(run())
-            # Keep internal schemas intact for validation; every public discovery
-            # and call result is redacted at its own boundary.
             return self._bounded(
                 self._redact(item, result) if operation == "call" else result
             )
@@ -472,7 +463,6 @@ class Integrations:
                 "MCP operation timed out; its effects may be uncertain. Check locally before retrying."
             ) from None
         except Exception as exc:
-            # anyio transport task groups may wrap our safe validation errors.
             pending = [exc]
             for _ in range(64):
                 if not pending:
@@ -485,8 +475,6 @@ class Integrations:
                         "MCP operation timed out; its effects may be uncertain. Check locally before retrying."
                     ) from None
                 pending.extend(getattr(problem, "exceptions", ()))
-            # Never echo SDK exceptions: they can contain URLs, headers, arguments
-            # and remote error data. Raw subprocess stderr is discarded above.
             raise IntegrationError(
                 "MCP operation failed. Check the locally selected adapter and optional SDK installation."
             ) from None

@@ -66,7 +66,6 @@ class OAuth:
 
     @property
     def base(self):
-        # Never derive OAuth issuer URLs from caller-controlled Host or proxy headers.
         v = Path(self.url_file).read_text().strip() if self.url_file else self.fixed_url
         u = urlsplit(v)
         if (
@@ -80,8 +79,6 @@ class OAuth:
         return v.rstrip("/")
 
     def _valid_resource(self, resource):
-        # Different MCP client flows send either the issuer origin or the /mcp URL.
-        # Both represent this same bridge, never an arbitrary resource or origin.
         return resource in (self.base, self.base + "/mcp")
 
     def protected(self):

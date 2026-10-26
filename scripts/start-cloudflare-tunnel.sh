@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# CTF Web Bridge: one-command authenticated network bridge + Cloudflare Quick Tunnel.
 # Use only with challenge instances you are authorized to test.
 set -Eeuo pipefail
 umask 077
@@ -112,11 +111,9 @@ PY_KEY
 fi
 chmod 600 "$CTF_SERVICE_TOKEN_FILE"
 export CTF_PUBLIC_URL_FILE="$RUNTIME/public-url"
-# Clear stale issuer config before launching the new tunnel.
 : > "$CTF_PUBLIC_URL_FILE"
 chmod 600 "$CTF_PUBLIC_URL_FILE"
 
-# Install a user-local cloudflared binary on Linux when it is missing.
 CF="$(command -v cloudflared || true)"
 if [[ -z "$CF" && -x "$RUNTIME/bin/cloudflared" ]]; then CF="$RUNTIME/bin/cloudflared"; fi
 if [[ -z "$CF" ]]; then

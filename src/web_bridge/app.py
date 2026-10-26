@@ -253,9 +253,6 @@ class Companion(
                     "chatgpt_events": False,
                 },
                 "local_controls": "Open the companion control panel on this computer to change permissions or approve operations.",
-                # A compact, read-only capability map lets the AI choose a
-                # working route from the first status call. Only locally
-                # granted adapters appear; no credentials, roots, or commands.
                 "working_context": self.working_context(),
             }
 

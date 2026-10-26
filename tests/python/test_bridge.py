@@ -147,7 +147,6 @@ def test_authenticated_http_mcp(app):
         vchallenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
         args={'client_id':reg['client_id'],'redirect_uri':redirect,'response_type':'code','code_challenge':vchallenge,
               'code_challenge_method':'S256','resource':meta['resource'],'scope':'ctf:access','state':'abc'}
-        # ChatGPT and other compliant clients can identify the resource by its origin.
         args['resource'] = 'https://bridge.example.test'
         login=urlopen(base+'/authorize?'+urlencode(args)).read().decode()
         assert 'CTF Instance Bridge' in login and 'password' in login

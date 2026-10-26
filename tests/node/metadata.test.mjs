@@ -25,3 +25,29 @@ test('source and distribution dependencies exist', () => {
   }
   assert.ok(existsSync('README.md'), 'Missing main README');
 });
+
+test('release version remains consistent across installers, metadata, gateway, and CI', () => {
+  const version = json('package.json').version;
+  const plugin = json('Plugin/plugin.json');
+  const codexPlugin = json('Plugin/.codex-plugin/plugin.json');
+  assert.equal(plugin.version, codexPlugin.version);
+  assert.match(readFileSync('README.md', 'utf8'), new RegExp('Version \\*\\*' + version.replaceAll('.', '\\.') ));
+  assert.match(readFileSync('pyproject.toml', 'utf8'), new RegExp('version = "' + version.replaceAll('.', '\\.') + '"'));
+  const lock = json('package-lock.json');
+  assert.equal(lock.version, version);
+  assert.equal(lock.packages[''].version, version);
+  const files = [
+    'scripts/install.ps1', 'scripts/install.sh', 'gateway/runtime.js',
+    'gateway/interface.html', '.github/workflows/ci.yml',
+    'src/web_bridge/ui/control.html',
+  ];
+  for (const path of files) {
+    const text = readFileSync(path, 'utf8');
+    assert(text.includes(version), path + ' does not reference current ' + version);
+    assert(!/3\\.2\\.(?:0|1)(?!\\d)/.test(text), path + ' references a stale Localize release');
+  }
+  const installUrl = 'releases/download/v' + version;
+  for (const path of ['scripts/install.ps1', 'scripts/install.sh', 'README.md']) {
+    assert(readFileSync(path, 'utf8').includes(installUrl), path + ' uses an old release URL');
+  }
+});

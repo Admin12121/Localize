@@ -20,10 +20,7 @@ from web_bridge.workspace.files import WorkspaceError, linked
 _LABEL = "dev.web-bridge.owner"
 _MAX_OUTPUT = 256_000
 
-# Each exec has a random directory and token unrelated to the public job ID.
-# The session leader remains alive until cleanup, allowing cancellation to
-# verify both Linux process start time and the inherited per-exec token before
-# signaling its process group. No container-wide signal is used.
+# Per-exec identity and process start time constrain cancellation to owned commands.
 _IDENTITY_FUNCTION = r"""
 signal_group() {
     test -f "$d/identity" || return 1
@@ -87,7 +84,7 @@ _CANCEL = _IDENTITY_FUNCTION + r"""
 d=$1; token=$2
 test -d "$d" && test ! -L "$d" || exit 3
 : > "$d/cancelled" || exit 125
-# The tombstone prevents a command queued in docker exec from starting later.
+# Tombstones prevent queued commands from starting after cancellation.
 i=0
 while test "$i" -lt 40; do
     if signal_group TERM; then
@@ -149,8 +146,7 @@ class DockerProject:
 
     def _invoke(self, args, timeout=30):
         environment = dict(os.environ)
-        # Explicit CLI flags select the pinned context; inherited overrides must
-        # not make readiness and execution address different engines.
+        # Pin the Docker context so preflight and execution use the same engine.
         for key in (
             "DOCKER_HOST",
             "DOCKER_CONTEXT",
@@ -182,8 +178,7 @@ class DockerProject:
                 "Docker could not start. Check the local Docker installation and access permissions."
             ) from None
         if result.returncode:
-            # Raw Docker diagnostics can contain host paths, endpoints, and
-            # registry credentials. Keep remote-facing errors bounded and safe.
+            # Docker diagnostics can expose credentials or local paths.
             if args[:2] == ["image", "inspect"]:
                 raise WorkspaceError(
                     "Image is missing; explicitly pull or prepare it locally."
@@ -305,7 +300,6 @@ class DockerProject:
                     raise WorkspaceError(
                         "A Docker host override is active; select an explicit local context instead."
                     )
-                # Resolve with the same config directory that all later calls use.
                 previous = self._config
                 self._config = {"docker_config": str(docker_config), "context": None}
                 try:
@@ -385,9 +379,6 @@ class DockerProject:
                 candidate["endpoint"] = self._endpoint(context)
                 self._check_engine()
                 if previous and previous.get("container_id"):
-                    # Never silently attach an existing container to different
-                    # image, network or resource settings. Docker cannot update
-                    # these reliably through a saved bridge profile.
                     pinned = (
                         "docker_config", "context", "endpoint", "root",
                         "identity", "workdir", "image", "network",
@@ -411,8 +402,6 @@ class DockerProject:
 
     @staticmethod
     def _host_path(path):
-        # Docker Desktop inspection can return its VM translation of a Windows
-        # host path. Normalize only these documented Desktop drive mappings.
         value = str(path).replace("\\", "/")
         match = re.fullmatch(
             r"/(?:run/desktop/mnt/host|host_mnt)/([A-Za-z])/(.*)", value
@@ -458,7 +447,6 @@ class DockerProject:
             raise WorkspaceError(
                 "Container must mount the selected host project read-write at the configured workspace path."
             )
-        # An overlapping child mount would hide a part of the host workspace.
         if any(
             m.get("Destination", "").startswith(config["workdir"] + "/")
             for m in info.get("Mounts", [])
@@ -637,13 +625,11 @@ class DockerProject:
                 )
                 self._save()
             elif action == "detach":
-                # Never unbind a container with an active per-command cancellation
-                # identity: doing so could make its process group unrecoverable.
+                # Do not detach with active executions; their cancellation identity must remain valid.
                 if self._jobs:
                     raise WorkspaceError(
                         "Finish or cancel active Docker commands before detaching."
                     )
-                # Detaching only clears bridge selection, not the container.
                 config.update(container_id=None, mode=None, allow_broad_access=False)
                 self._save()
             elif action in ("start", "stop", "remove", "logs"):
@@ -674,8 +660,6 @@ class DockerProject:
     def validate_workspace(self, workspace):
         with self._lock:
             self._check_workspace(workspace)
-            # Restore the authoritative Workspace object when a previously
-            # configured Docker project is reopened after companion restart.
             self._workspace = workspace
             return True
 
@@ -718,7 +702,6 @@ class DockerProject:
                 or any(ord(c) < 32 for c in cwd)
             ):
                 raise WorkspaceError("Use a relative container workspace directory.")
-            # Reuse the filesystem policy for linked/excluded work directories.
             if self._workspace:
                 parts = self._workspace.parts(cwd, directory=True)
                 with self._workspace.parent(parts):

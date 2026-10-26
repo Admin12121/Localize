@@ -27,8 +27,6 @@ def launch_command(argv=None, command=None, shell=None, environment="host"):
         executable = shutil.which("pwsh" if shell == "pwsh" else "powershell")
         if not executable:
             raise WorkspaceError("The selected PowerShell is not installed.")
-        # Preserve native failures as well as terminating cmdlet errors. The
-        # owner sees the original command, not just this transport encoding.
         script = (
             "$ErrorActionPreference='Stop'; $global:LASTEXITCODE=0; try {\n"
             + command

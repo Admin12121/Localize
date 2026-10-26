@@ -172,7 +172,6 @@ def test_unsettled_terminal_receipt_recovers_as_unknown_without_losing_exit(tmp_
     import sqlite3
     jobs,ws=ready(tmp_path)
     completed=finish(jobs,request(jobs,ws,'import sys;print("exit-evidence");sys.exit(7)'))
-    # Simulate lost confirmation of cleanup after persisting terminal evidence.
     with sqlite3.connect(jobs.receipt_path) as db:
         db.execute('UPDATE receipts SET settled=0 WHERE job_id=?',(completed['job_id'],))
     restarted=Jobs(jobs.runtime,threading.RLock(),lambda generation:True)
@@ -233,7 +232,6 @@ def test_scope_migration_and_compaction_preserve_recovery_blocker(tmp_path):
     expected=hashlib.sha256(os.path.normcase(str(ws.root)).encode()).hexdigest()
     assert queued['workspace_scope']==expected
     assert str(ws.root) not in json.dumps(queued)
-    # Older receipt databases have neither scope nor recovery indexing columns.
     with sqlite3.connect(jobs.receipt_path) as db:
         raw=json.loads(db.execute('SELECT result FROM receipts WHERE job_id=?',(queued['job_id'],)).fetchone()[0])
         raw['state']='running';raw['execution']={'pid':123,'environment':'host'}
@@ -288,7 +286,6 @@ def test_dashboard_reads_only_compact_receipts_and_preserves_human_shell_label(t
     connect=sqlite3.connect
     def summary_only(*args,**kwargs):
         db=connect(*args,**kwargs)
-        # Enforce the dashboard read contract at the actual SQLite boundary.
         def authorize(action,table,column,*ignored):
             return sqlite3.SQLITE_DENY if action==sqlite3.SQLITE_READ and table=='receipts' and column=='result' else sqlite3.SQLITE_OK
         db.set_authorizer(authorize)
@@ -367,7 +364,6 @@ def test_failed_docker_cleanup_retains_identity_and_memory_blocker_during_storag
         assert queued['job_id'] in project._jobs
         assert project.worker.poll() is None
         assert holders=={queued['job_id']}
-        # Recovery blocking survives unavailable storage in the current process.
         with sqlite3.connect(jobs.receipt_path) as db:
             db.execute('DROP TRIGGER reject_execution_receipts')
         original_database=jobs.database

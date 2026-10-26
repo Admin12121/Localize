@@ -293,8 +293,6 @@ def test_long_callback_renews_leases_and_invalidation_stops_further_execution(tm
     try:
         started = runner.start(task, WS)
         assert entered.wait(2)
-        # Wait for the actual heartbeat rather than assuming the macOS runner
-        # will schedule a thread within a 30 ms sleep under CI load.
         renewed.clear()
         assert renewed.wait(2), 'Workspace renewal heartbeat did not run'
         with pytest.raises(ValueError, match='lease'):

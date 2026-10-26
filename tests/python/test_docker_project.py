@@ -212,12 +212,9 @@ def test_real_docker_persistent_mount_and_attached_command_cancellation(tmp_path
         assert completed.returncode == 0, completed.stderr
         assert completed.stdout.strip() == '/workspace'
         assert (root / 'roundtrip.txt').read_text() == 'from-container'
-        # A separate registry attaches this fixture container without inheriting
-        # the creator's ownership record. Its cancel path must still be safe.
         attached = DockerProject(tmp_path / 'attached-runtime')
         attached.configure({'image': 'node:24-alpine'}, workspace)
         assert not attached.action('attach', workspace, container=created)['owned']
-        # Existing environment process must survive cancellation of a separate exec group.
         unrelated = subprocess.Popen(docker._command(['exec', created, 'sh', '-c', 'sleep 60']), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         running = subprocess.Popen(attached.build_command('cancel-me', ['node', '-e',
             "const fs=require('fs'),cp=require('child_process'); const child=cp.spawn('node',['-e',`setTimeout(()=>require('fs').writeFileSync('escaped.txt','bad'),2500);setInterval(()=>{},1000)`]);fs.writeFileSync('started.txt',JSON.stringify({pid:process.pid,child:child.pid}));setInterval(()=>{},1000)"], ''), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -226,8 +223,6 @@ def test_real_docker_persistent_mount_and_attached_command_cancellation(tmp_path
         assert (root / 'started.txt').exists()
         assert attached.cancel('cancel-me')
         running.wait(timeout=10)
-        # Both the main exec and its ordinary child must be gone; an unrelated
-        # process in the same attached container remains alive.
         identities = json.loads((root / 'started.txt').read_text())
         check = subprocess.run(docker._command(['exec', created, 'sh', '-c',
             'for p in "$@"; do test ! -e /proc/$p/stat || test "$(awk \'{print $3}\' /proc/$p/stat)" = Z || exit 1; done',
@@ -239,7 +234,6 @@ def test_real_docker_persistent_mount_and_attached_command_cancellation(tmp_path
         assert docker.status()['running']
         assert docker.action('logs', workspace)['logs'] == ''
     finally:
-        # This fixture created and recorded this container; do not inspect/delete other containers.
         if created:
             docker.action('remove', workspace)
         for process in (running, unrelated):
